@@ -28,3 +28,26 @@ make sure you are familiar with ros2 rules.
 1. costfunc_config
 2. lbgfs_config
 3. sfc_config
+
+
+
+
+## Installation
+首先同步python依赖
+```shell
+uv sync
+```
+
+python工具链自动构建cpp-pybind11
+```shell
+uv pip install -e . --no-deps
+```
+
+生成pybind11静态类型提示
+```shell
+uv run pybind11-stubgen trajectory
+```
+然后将生成的stub/*.pyi 移动至与*.so同级别路径下。
+
+（似乎最新配置的uv sync直接一步到位了？？？）
+（TODO：应该移动到 site-packages下面）

@@ -1,24 +1,58 @@
-import setuptools
-
-from pybind11.setup_helpers import Pybind11Extension  # type: ignore
-import pybind11  # type: ignore
+from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext
+import pybind11
+import os
+import subprocess
+import sys
 
 EIGEN_INCLUDE_DIR = "/usr/include/eigen3"
 PROJETCT_INCLUDE_DIR = "src/minco_trajectory/include"
 
 ext_modules = [
-    Pybind11Extension(
+    Extension(
         "trajectory",
         ["src/minco_trajectory/src/traj_bindings.cpp"],
         include_dirs=[pybind11.get_include(), PROJETCT_INCLUDE_DIR, EIGEN_INCLUDE_DIR],
+        language="c++",
         cxx_std=17,
+        extra_compile_args=["-std=c++17"],
     ),
 ]
 
-setuptools.setup(
-    name="trajectory",
-    ext_modules=ext_modules,
+
+# 自定义 build 命令：生成类型提示
+class BuildWithStubs(build_ext):
+    def run(self):
+        # 1. 先编译 C++ 模块
+        super().run()
+
+        # 2. 生成类型提示（.pyi）
+        try:
+            # 使用 subprocess 调用 pybind11-stubgen
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pybind11_stubgen",
+                    "--module-name=trajectory",
+                    "--output-dir=./stubs",
+                    "--ignore-invalid=all",
+                ],
+                check=True,
+            )
+
+            os.system("cp ./stubs/trajectory.pyi ./")
+        except Exception as e:
+            print(f"Warning: Failed to generate stubs - {e}")
+
+
+setup(
+    name="minco-python",
     version="0.1.0",
-    author="Your Name",
-    description="A pybind11 for polynomial trajectory representation",
+    ext_modules=ext_modules,
+    cmdclass={"build_ext": BuildWithStubs},
+    packages=["trajectory-stubs"],
+    package_data={"trajectory-stubs": ["*.pyi"]},
+    install_requires=["pybind11>=2.10.0", "pybind11-stubgen>=0.12"],
+    python_requires=">=3.7",
 )
