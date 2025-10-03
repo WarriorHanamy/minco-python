@@ -11,5 +11,20 @@
 2. flatness前向方向部分基于casadi来进行代码生成，集成。
 3. 暴露python接口，用户不应体验cpp的细节。
 
+## WARNING
+make sure you are familiar with ros2 rules.
 
 
+## pybind11接口设计
+1. setup_intial_trajectory
+    Args:
+        1. headPVAJ, tailPVAJ, initTimeAllooc, init
+    Params:
+        1. lbfgs setting
+
+
+
+## Config设计
+1. costfunc_config
+2. lbgfs_config
+3. sfc_config

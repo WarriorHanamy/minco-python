@@ -29,12 +29,11 @@
 #include <cfloat>
 #include <cmath>
 #include <iostream>
-#include <tailsitter_df/tailsitter_df.hpp>
 #include <vector>
 
-#include "gcopter/geo_utils.hpp"
-#include "gcopter/lbfgs.hpp"
-#include "gcopter/minco.hpp"
+#include "geo_utils.hpp"
+#include "lbfgs.hpp"
+#include "minco.hpp"
 
 namespace gcopter
 {
@@ -784,12 +783,9 @@ namespace gcopter
         {
             const int sizeM = intervalNs.size();
             const int sizeN = intervalNs.sum();
-            std::cerr << "sizeM" << sizeM << std::endl;
-            std::cerr << "sizeN" << sizeN << std::endl;
 
             innerPoints.resize(3, sizeN - 1);
             timeAlloc.resize(sizeN);
-            std::cerr << "intervalNs " << intervalNs.transpose() << "\n";
             Eigen::Vector3d a, b, c;
             for (int i = 0, j = 0, k = 0, l; i < sizeM; i++)
             {
@@ -888,9 +884,6 @@ namespace gcopter
             Eigen::Map<Eigen::VectorXd> tau(x.data(), temporalDim);
             Eigen::Map<Eigen::VectorXd> xi(x.data() + temporalDim, spatialDim);
 
-            // print points and times
-            std::cerr << "points before\n" << points << std::endl;
-            std::cerr << "times before\n" << times.transpose() << std::endl;
             backwardT(times, tau);
             backwardP(points, vPolyIdx, vPolytopes, xi);
 
@@ -913,9 +906,6 @@ namespace gcopter
                 forwardP(xi, vPolyIdx, vPolytopes, points);
                 minco.setParameters(points, times);
                 minco.getTrajectory(traj);
-                // print after
-                std::cerr << "points after\n" << points << std::endl;
-                std::cerr << "times after\n" << times.transpose() << std::endl;
             }
             else
             {

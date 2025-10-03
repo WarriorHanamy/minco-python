@@ -25,7 +25,7 @@
 #ifndef TRAJECTORY_HPP
 #define TRAJECTORY_HPP
 
-#include "gcopter/root_finder.hpp"
+#include "root_finder.hpp"
 
 #include <Eigen/Eigen>
 

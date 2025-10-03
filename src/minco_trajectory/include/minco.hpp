@@ -25,7 +25,7 @@
 #ifndef MINCO_HPP
 #define MINCO_HPP
 
-#include "gcopter/trajectory.hpp"
+#include "trajectory.hpp"
 
 #include <Eigen/Eigen>
 

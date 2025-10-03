@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel", "pybind11[global]"]
 
 [project]
 authors = [
@@ -28,7 +28,7 @@ dependencies = [
 ]
 description = "Reinforcement Learning for Tailsitter UAVs"
 license = {text = "MIT"}
-name = "vtol_rl"
+name = "minco-python"
 readme = "README.md"
 requires-python = ">=3.8"
 version = "0.1.0"
@@ -52,4 +52,4 @@ filterwarnings = [
 python_classes = "Test*"
 python_files = "test_*.py"
 python_functions = "test_*"
-testpaths = ["vtol_rl/tests"]
+testpaths = ["minco-python/tests"]
