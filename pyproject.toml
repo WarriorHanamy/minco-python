@@ -1,0 +1,55 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0"]
+
+[project]
+authors = [
+  {name = "Hanamy", email = "rongerch@outlook.com"},
+]
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "pandas",
+  "scipy",
+  "casadi",
+  "scikit-learn",
+  "seaborn",
+  "sympy",
+  "control",
+  "gymnasium",
+  "ipykernel",
+  "notebook",
+  "jupyter",
+  "jupyter_client",
+  "jupyter_core",
+  "traitlets",
+  "ipywidgets>=8,<9",
+  "stable-baselines3[extra]",
+]
+description = "Reinforcement Learning for Tailsitter UAVs"
+license = {text = "MIT"}
+name = "vtol_rl"
+readme = "README.md"
+requires-python = ">=3.8"
+version = "0.1.0"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.uv]
+dev-dependencies = [
+  "ruff",
+  "pre-commit",
+  "pytest>=7.0",
+  "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+  "ignore:The use of `x.T` on tensors of dimension other than 2:UserWarning",
+  "ignore:You are trying to run PPO on the GPU:UserWarning",
+]
+python_classes = "Test*"
+python_files = "test_*.py"
+python_functions = "test_*"
+testpaths = ["vtol_rl/tests"]
