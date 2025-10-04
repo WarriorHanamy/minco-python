@@ -155,9 +155,10 @@ class FlatnessMap
 
     inline void configure_from_file(const std::string &file_path = kDefaultConfigPath)
     {
+        const std::string path = file_path.empty() ? kDefaultConfigPath : file_path;
         try
         {
-            YAML::Node root = YAML::LoadFile(file_path);
+            YAML::Node root = YAML::LoadFile(path);
             const YAML::Node node = root["flatness"].IsDefined()
                                          ? root["flatness"]
                                          : root;
@@ -179,7 +180,7 @@ class FlatnessMap
         catch (const YAML::Exception &ex)
         {
             throw std::runtime_error("Failed to load flatness config from " +
-                                     file_path + ": " + ex.what());
+                                     path + ": " + ex.what());
         }
     }
 

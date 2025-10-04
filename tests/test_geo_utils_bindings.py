@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Tuple
+
 import numpy as np
 
 import minco
@@ -11,7 +15,24 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 from matplotlib.patches import Patch
 
 
-def visualize_3d_planes(h_poly, plot_size=(-1.5, 1.5), figsize=(10, 8)):
+def _cube_polytope() -> np.ndarray:
+    return np.array(
+        [
+            [1.0, 0.0, 0.0, -1.0],
+            [-1.0, 0.0, 0.0, -1.0],
+            [0.0, 1.0, 0.0, -1.0],
+            [0.0, -1.0, 0.0, -1.0],
+            [0.0, 0.0, 1.0, -1.0],
+            [0.0, 0.0, -1.0, -1.0],
+        ]
+    )
+
+
+def visualize_3d_planes(
+    h_poly: np.ndarray,
+    plot_size: Tuple[float, float] = (-1.5, 1.5),
+    figsize: Tuple[float, float] = (10, 8),
+) -> None:
     """
     Visualize a set of 3D planes defined by the inequality a*x + b*y + c*z + d <= 0
 
@@ -84,19 +105,8 @@ def visualize_3d_planes(h_poly, plot_size=(-1.5, 1.5), figsize=(10, 8)):
     plt.show()
 
 
-def test_cube_polytope_vertices_and_overlap():
-    h_poly = np.array(
-        [
-            [1.0, 0.0, 0.0, -1.0],
-            [-1.0, 0.0, 0.0, -1.0],
-            [0.0, 1.0, 0.0, -1.0],
-            [0.0, -1.0, 0.0, -1.0],
-            [0.0, 0.0, 1.0, -1.0],
-            [0.0, 0.0, -1.0, -1.0],
-        ]
-    )
-
-    # visualize_3d_planes(h_poly)
+def test_cube_polytope_vertices_and_overlap() -> None:
+    h_poly = _cube_polytope()
 
     ok, interior = minco.geo_utils.find_interior(h_poly)
     assert ok
@@ -175,4 +185,4 @@ def test_cube_polytope_vertices_and_overlap():
 
 
 if __name__ == "__main__":
-    test_cube_polytope_vertices_and_overlap()
+    visualize_3d_planes(_cube_polytope())

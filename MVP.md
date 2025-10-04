@@ -16,10 +16,6 @@
 namespace minco::flatness {
 
 template <typename T>
-concept FlatnessConfig =
-    std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>;
-
-template <typename T>
 concept ForwardQuery = requires(T value) {
     { value.velocity } -> std::convertible_to<Eigen::Vector3d>;
     { value.acceleration } -> std::convertible_to<Eigen::Vector3d>;
@@ -55,13 +51,13 @@ concept FlatnessModel = requires(Model model,
                                  const typename Model::ConfigType &config,
                                  const typename Model::ForwardQuery &fwd_query,
                                  const typename Model::BackwardQuery &bwd_query) {
-    FlatnessConfig<typename Model::ConfigType>;
     ForwardQuery<typename Model::ForwardQuery>;
     ForwardResult<typename Model::ForwardResult>;
     BackwardQuery<typename Model::BackwardQuery>;
     BackwardResult<typename Model::BackwardResult>;
 
     { model.configure(config) } -> std::same_as<void>;
+    { model.configure_from_file(std::declval<std::string>()) } -> std::same_as<void>;
     { model.forward(fwd_query) } -> std::same_as<typename Model::ForwardResult>;
     { model.backward(bwd_query) } -> std::same_as<typename Model::BackwardResult>;
 };
@@ -81,8 +77,30 @@ class GCOPTER_PolytopeSFC {
 
     FlatnessModel &flatness() { return flatness_model_; }
 
+    void configure_from_file(const std::string &file_path)
+    {
+        const std::string path = file_path.empty() ? kDefaultGcopterConfigPath
+                                                   : file_path;
+        auto node = YAML::LoadFile(path);
+        flatness_model_.configure_from_file(path);
+        cost_config_.configure_from_node(node);
+        const auto gcopter_node = node["gcopter"];
+        if (gcopter_node && gcopter_node["yaw_smooth"])
+        {
+            yaw_smooth_ = gcopter_node["yaw_smooth"].as<double>();
+        }
+        else
+        {
+            yaw_smooth_ = 1.0e-6;
+        }
+    }
+
    private:
+    static constexpr const char *kDefaultGcopterConfigPath =
+        "config/default_gcopter.yaml";
     FlatnessModel flatness_model_{};
+    double        yaw_smooth_{1.0e-6};
+    CostConfig   &cost_config_{CostConfig::getInstance()};
 };
 ```
 
@@ -194,20 +212,35 @@ struct DefaultFlatness {
 ### 2. 配置示例文件
 
 ```yaml
-# config/minco.yaml
+# config/default_gcopter.yaml
 flatness:
-  mass: 1.2                    # 质量 (kg)
+  mass: 1.0                    # 质量 (kg)
   gravity: 9.81                # 重力加速度 (m/s²)
-  horizontal_drag: 0.1         # 水平阻力系数
-  vertical_drag: 0.05          # 垂直阻力系数
+  horizontal_drag: 0.10        # 水平阻力系数
+  vertical_drag: 0.10          # 垂直阻力系数
   parasitic_drag: 0.01         # 寄生阻力系数
-  speed_smooth: 1e-3           # 速度平滑因子
+  speed_smooth: 1.0e-3         # 速度平滑因子
 
-constraints:
-  max_velocity: 5.0            # 最大速度 (m/s)
-  max_acceleration: 10.0       # 最大加速度 (m/s²)
-  max_thrust: 20.0             # 最大推力 (N)
-  min_thrust: 2.0              # 最小推力 (N)
+cost:
+  v_max: 5.0
+  omg_x_max: 1.0
+  omg_y_max: 2.0
+  omg_z_max: 1.0
+  acc_max: 50.0
+  thrust_min: -20.0
+  thrust_max: 20.0
+  pos_weight: 1.0
+  vel_weight: 0.0
+  acc_weight: 0.0
+  omg_x_weight: 0.0
+  omg_y_weight: 0.0
+  omg_z_weight: 0.0
+  thrust_weight: 0.0
+  time_weight: 0.0
+  omg_consistent_weight: 0.0
+
+gcopter:
+  yaw_smooth: 1.0e-6
 ```
 
 

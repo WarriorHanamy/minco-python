@@ -1,5 +1,12 @@
 # MINCO-Python Project Code Style Guide
 
+## Terminal CLI tools conventions
+IMPORTANT!!!
+When run python scripts, always choose
+`uv run python ...`
+When run pytest
+`uv run pytest`
+
 ## Overview
 This project is a Python binding for MINCO (Minimum Control Effort) trajectory optimization library, providing efficient trajectory planning capabilities.
 

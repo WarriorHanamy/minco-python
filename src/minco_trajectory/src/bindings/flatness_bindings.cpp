@@ -2,6 +2,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <string>
+
 #include "bindings.hpp"
 #include "flatness.hpp"
 
@@ -10,14 +12,14 @@ namespace py = pybind11;
 void bind_flatness(py::module_ &m)
 {
     auto sub = m.def_submodule("flatness", "Forward and backward flatness transforms");
-    py::class_<flatness::FlatnessMap>(sub, "FlatnessMap")
+    py::class_<minco::flatness::FlatnessMap>(sub, "FlatnessMap")
         .def(py::init<>())
-        .def("reset", &flatness::FlatnessMap::reset,
-             py::arg("mass"), py::arg("gravity"), py::arg("horizontal_drag"), py::arg("vertical_drag"),
-             py::arg("parasitic_drag"), py::arg("speed_smooth"),
-             "Configure vehicle and drag parameters.")
+        .def("configure_from_file",
+             &minco::flatness::FlatnessMap::configure_from_file,
+             py::arg("file_path") = std::string(),
+             "Load flatness parameters from a YAML configuration file (empty path selects the default bundle).")
         .def("forward",
-             [](flatness::FlatnessMap &self,
+             [](minco::flatness::FlatnessMap &self,
                 const Eigen::Vector3d &vel,
                 const Eigen::Vector3d &acc,
                 const Eigen::Vector3d &jer,
@@ -32,7 +34,7 @@ void bind_flatness(py::module_ &m)
              py::arg("vel"), py::arg("acc"), py::arg("jer"), py::arg("psi"), py::arg("dpsi"),
              "Run the forward flatness map and return (thrust, quaternion, body_rates).")
         .def("backward",
-             [](const flatness::FlatnessMap &self,
+             [](const minco::flatness::FlatnessMap &self,
                 const Eigen::Vector3d &pos_grad,
                 const Eigen::Vector3d &vel_grad,
                 const double &thr_grad,

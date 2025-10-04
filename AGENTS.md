@@ -12,6 +12,7 @@
 - `uv run ruff check .` / `uv run ruff format .` — lint and auto-format Python surfaces.
 
 ## Coding Style & Naming Conventions
+- Python Type Hinting All the time
 - Python follows PEP 8 with four-space indents and snake_case modules; classes use UpperCamelCase.
 - C++ headers stay header-only when feasible; favor descriptive Eigen typedefs and keep namespaces aligned with file paths.
 - Match config keys in YAML (`config/global_planning.yaml`) with snake_case accessors in code.

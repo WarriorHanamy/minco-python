@@ -45,7 +45,7 @@ uv pip install -e . --no-deps
 
 生成pybind11静态类型提示
 ```shell
-uv run pybind11-stubgen trajectory
+uv run pybind11-stubgen minco
 ```
 然后将生成的stub/*.pyi 移动至与*.so同级别路径下。
 

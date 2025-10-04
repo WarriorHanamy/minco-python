@@ -1,0 +1,8 @@
+# Default physical parameters for the built-in flatness map
+flatness:
+  mass: 1.1
+  gravity: 9.81
+  horizontal_drag: 0.05
+  vertical_drag: 0.05
+  parasitic_drag: 0.01
+  speed_smooth: 0.001

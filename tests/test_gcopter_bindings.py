@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
 import numpy as np
 
 import minco
@@ -8,7 +12,9 @@ matplotlib.use("WebAgg")
 import matplotlib.pyplot as plt
 
 
-def visualize_gcopter_trajectory(trajectory, time_samples=None):
+def visualize_gcopter_trajectory(
+    trajectory: Any, time_samples: Optional[np.ndarray] = None
+) -> None:
     """
     Visualize GCOPTER trajectory with two subplots:
     - Left: 3D trajectory with start (green) and end (red) markers
@@ -55,37 +61,9 @@ def visualize_gcopter_trajectory(trajectory, time_samples=None):
     plt.close(fig)
 
 
-def test_gcopter_circle_warm_start_visualization():
+def _run_gcopter_circle_warm_start() -> Dict[str, Any]:
     optimizer = minco.gcopter.GCOPTERPolytopeSFC()
-
-    optimizer.configure_flatness(
-        mass=1.0,
-        gravity=9.81,
-        horizontal_drag=0.1,
-        vertical_drag=0.1,
-        parasitic_drag=0.01,
-        speed_smooth=1.0e-3,
-        yaw_smooth=1.0e-6,
-    )
-
-    optimizer.configure_cost(
-        v_max=5.0,
-        omg_x_max=1.0,
-        omg_y_max=2.0,
-        omg_z_max=1.0,
-        acc_max=50.0,
-        thrust_min=-20.0,
-        thrust_max=20.0,
-        pos_weight=1.0,
-        vel_weight=0.0,
-        acc_weight=0.0,
-        omg_x_weight=0.0,
-        omg_y_weight=0.0,
-        omg_z_weight=0.0,
-        thrust_weight=0.0,
-        time_weight=0.0,
-        omg_consistent_weight=0.0,
-    )
+    optimizer.configure_from_file("")
 
     radius = 5.0
     height = 1.0
@@ -142,20 +120,32 @@ def test_gcopter_circle_warm_start_visualization():
     print(f"Optimization took {(end_time - start_time) * 1e3} ms")
 
     assert np.isfinite(cost)
-    assert trajectory.get_piece_num() == piece_count
     print(f"final cost: {cost}")
     time_samples = np.linspace(0.0, trajectory.total_duration, 500)
     positions = np.array([trajectory.get_pos(t) for t in time_samples])
-    vels = np.array([trajectory.get_vel(t) for t in time_samples])
+    return {
+        "cost": cost,
+        "trajectory": trajectory,
+        "time_samples": time_samples,
+        "positions": positions,
+        "pos0": pos0,
+        "piece_count": piece_count,
+    }
 
+
+def test_gcopter_circle_warm_start_visualization() -> None:
+    result = _run_gcopter_circle_warm_start()
+    trajectory = result["trajectory"]
+    positions = result["positions"]
+    pos0 = result["pos0"]
+
+    assert trajectory.get_piece_num() == result["piece_count"]
     assert np.isfinite(positions).all()
     assert np.linalg.norm(positions[0] - pos0) < 1e-6
     assert np.linalg.norm(positions[-1] - pos0) < 1e-2
     assert np.max(np.linalg.norm(positions, axis=1)) < 1e3
 
-    # Use the separate visualization function
-    visualize_gcopter_trajectory(trajectory, time_samples)
-
 
 if __name__ == "__main__":
-    test_gcopter_circle_warm_start_visualization()
+    outputs = _run_gcopter_circle_warm_start()
+    visualize_gcopter_trajectory(outputs["trajectory"], outputs["time_samples"])

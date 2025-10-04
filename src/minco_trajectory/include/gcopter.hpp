@@ -30,7 +30,10 @@
 #include <cfloat>
 #include <cmath>
 #include <iostream>
+#include <type_traits>
 #include <vector>
+#include <string>
+#include <yaml-cpp/yaml.h>
 
 #include "flatness.hpp"
 #include "geo_utils.hpp"
@@ -39,6 +42,9 @@
 
 namespace gcopter
 {
+    inline constexpr const char *kDefaultGcopterConfigPath =
+        "config/default_gcopter.yaml";
+
     struct CostConfig
     {
         double  v_max;
@@ -51,48 +57,91 @@ namespace gcopter
         double  time_weight;
         double  omg_consistent_weight;
         double &rho;
-        // singleton acquisition
+
         static CostConfig &getInstance()
         {
             static CostConfig instance;
             return instance;
         }
-        // disbale copy and assign
+
+        void configure_from_node(const YAML::Node &root)
+        {
+            const YAML::Node node = root["cost"].IsDefined()
+                                         ? root["cost"]
+                                         : root;
+            if (!node || node.IsNull())
+            {
+                return;
+            }
+
+            const auto assign = [&](const char *key, double &target) {
+                if (node[key])
+                {
+                    target = node[key].as<double>();
+                }
+            };
+
+            assign("v_max", v_max);
+            assign("omg_x_max", omg_x_max);
+            assign("omg_y_max", omg_y_max);
+            assign("omg_z_max", omg_z_max);
+            assign("acc_max", acc_max);
+            assign("thrust_min", thrust_min);
+            assign("thrust_max", thrust_max);
+            assign("pos_weight", pos_weight);
+            assign("vel_weight", vel_weight);
+            assign("acc_weight", acc_weight);
+            assign("omg_x_weight", omg_x_weight);
+            assign("omg_y_weight", omg_y_weight);
+            assign("omg_z_weight", omg_z_weight);
+            assign("thrust_weight", thrust_weight);
+            assign("time_weight", time_weight);
+            assign("omg_consistent_weight", omg_consistent_weight);
+        }
+
+        void configure_from_file(const std::string &file_path = std::string())
+        {
+            const std::string path =
+                file_path.empty() ? std::string(kDefaultGcopterConfigPath)
+                                  : file_path;
+            try
+            {
+                YAML::Node root = YAML::LoadFile(path);
+                configure_from_node(root);
+            }
+            catch (const YAML::Exception &ex)
+            {
+                throw std::runtime_error("Failed to load cost config from " +
+                                         path + ": " + ex.what());
+            }
+        }
+
         CostConfig(const CostConfig &)            = delete;
         CostConfig &operator=(const CostConfig &) = delete;
-        // turn it to the predefined speed
-        // default constructor
+
        private:
         CostConfig() : rho(time_weight)
         {
-            // all to zero
-            v_max         = 0.0;
-            omg_x_max     = 0.0;
-            omg_y_max     = 0.0;
-            omg_z_max     = 0.0;
-            omg_x_weight  = 0.0;
-            omg_y_weight  = 0.0;
-            omg_z_weight  = 0.0;
-            thrust_min    = 0.0;
-            thrust_max    = 0.0;
-            pos_weight    = 0.0;
-            vel_weight    = 0.0;
-            thrust_weight = 0.0;
-            time_weight   = 0.0;
+            v_max                 = 0.0;
+            omg_x_max             = 0.0;
+            omg_y_max             = 0.0;
+            omg_z_max             = 0.0;
+            acc_max               = 0.0;
+            thrust_min            = 0.0;
+            thrust_max            = 0.0;
+            pos_weight            = 0.0;
+            vel_weight            = 0.0;
+            acc_weight            = 0.0;
+            omg_x_weight          = 0.0;
+            omg_y_weight          = 0.0;
+            omg_z_weight          = 0.0;
+            thrust_weight         = 0.0;
+            time_weight           = 0.0;
+            omg_consistent_weight = 0.0;
         }
     };
 
-    struct FlatnessConfig
-    {
-        double mass            = 1.0;
-        double gravity         = 9.81;
-        double horizontal_drag = 0.0;
-        double vertical_drag   = 0.0;
-        double parasitic_drag  = 0.0;
-        double speed_smooth    = 1.0e-3;
-        double yaw_smooth      = 1.0e-6;
-    };
-
+    template <minco::flatness::FlatnessModel FlatnessModelT = minco::flatness::FlatnessMap>
     class GCOPTER_PolytopeSFC
     {
        public:
@@ -101,10 +150,22 @@ namespace gcopter
         using PolyhedraV  = std::vector<PolyhedronV>;
        using PolyhedraH  = std::vector<PolyhedronH>;
 
+        using FlatnessModel  = FlatnessModelT;
+        using FlatnessConfig = typename FlatnessModel::ConfigType;
+
       private:
         minco::MINCO_S3NU minco;
-        FlatnessConfig        flatness_config;
-        flatness::FlatnessMap flatness_map;
+        FlatnessConfig flatness_config_{};
+        double         yaw_smooth_ = 1.0e-6;
+        FlatnessModel  flatness_model_{};
+
+        inline void refresh_flatness_config()
+        {
+            if constexpr (requires(const FlatnessModel &model) { model.config(); })
+            {
+                flatness_config_ = flatness_model_.config();
+            }
+        }
 
         Eigen::Matrix3d headPVA;
         Eigen::Matrix3d tailPVA;
@@ -371,8 +432,8 @@ namespace gcopter
         static inline void attachPenaltyFunctional(
             const Eigen::VectorXd &T, const Eigen::MatrixX3d &coeffs,
             const double &smoothFactor, const int &integralResolution,
-            const CostConfig &config, const FlatnessConfig &flatness_config,
-            flatness::FlatnessMap &flatness_map, double &cost,
+            const CostConfig &config, const double yawSmooth,
+            FlatnessModel &flatness_model, double &cost,
             Eigen::VectorXd &gradT, Eigen::MatrixX3d &gradC)
         {
             const double velSqrMax  = config.v_max * config.v_max;
@@ -388,7 +449,6 @@ namespace gcopter
             const double weightVel     = config.vel_weight;
             const double weightAcc     = config.acc_weight;
             const double weightThrust  = config.thrust_weight;
-            const double yawSmooth     = flatness_config.yaw_smooth;
 
             const int    pieceNum     = T.size();
             const double integralFrac = 1.0 / integralResolution;
@@ -396,6 +456,11 @@ namespace gcopter
             double                      step, alpha;
             double                      s1, s2, s3, s4, s5;
             Eigen::Matrix<double, 6, 1> beta0, beta1, beta2, beta3, beta4;
+
+            using ForwardQuery  = typename FlatnessModel::ForwardQuery;
+            using ForwardResult = typename FlatnessModel::ForwardResult;
+            using BackwardQuery = typename FlatnessModel::BackwardQuery;
+            using BackwardResult = typename FlatnessModel::BackwardResult;
 
             for (int i = 0; i < pieceNum; i++)
             {
@@ -433,11 +498,26 @@ namespace gcopter
                         (vel(0) * acc(1) - vel(1) * acc(0)) /
                         std::max(velXYnorm + yawSmooth, 1e-12);
 
-                    double          thr;
-                    Eigen::Vector4d quat;
-                    Eigen::Vector3d omg;
-                    flatness_map.forward(vel, acc, jer, psi, dpsi, thr, quat,
-                                         omg);
+                    ForwardQuery forward_query;
+                    forward_query.velocity     = vel;
+                    forward_query.acceleration = acc;
+                    forward_query.jerk         = jer;
+                    if constexpr (requires(ForwardQuery q) { q.yaw = psi; })
+                    {
+                        forward_query.yaw = psi;
+                    }
+                    if constexpr (requires(ForwardQuery q) { q.yaw_rate = dpsi; })
+                    {
+                        forward_query.yaw_rate = dpsi;
+                    }
+
+                    ForwardResult forward_result =
+                        flatness_model.forward(forward_query);
+
+                    const double          thr  = forward_result.thrust;
+                    const Eigen::Vector4d quat = forward_result.quaternion;
+                    const Eigen::Vector3d omg  =
+                        forward_result.angular_velocity;
 
                     const double violaVel = vel.squaredNorm() - velSqrMax;
                     const double violaAcc = acc.squaredNorm() - accSqrMax;
@@ -515,10 +595,23 @@ namespace gcopter
                     Eigen::Vector3d backPos, backVel, backAcc, backJer;
                     double          psiGrad = 0.0;
                     double          dpsiGrad = 0.0;
-                    flatness_map.backward(Eigen::Vector3d::Zero(),
-                                          velPenaltyGrad, gradThr, gradQuat,
-                                          gradOmg, backPos, backVel, backAcc,
-                                          backJer, psiGrad, dpsiGrad);
+                    BackwardQuery backward_query;
+                    backward_query.position_gradient =
+                        Eigen::Vector3d::Zero();
+                    backward_query.velocity_gradient = velPenaltyGrad;
+                    backward_query.thrust_gradient   = gradThr;
+                    backward_query.quaternion_gradient = gradQuat;
+                    backward_query.angular_velocity_gradient = gradOmg;
+
+                    BackwardResult backward_result =
+                        flatness_model.backward(backward_query);
+
+                    backPos = backward_result.position_total_gradient;
+                    backVel = backward_result.velocity_total_gradient;
+                    backAcc = backward_result.acceleration_total_gradient;
+                    backJer = backward_result.jerk_total_gradient;
+                    psiGrad = backward_result.yaw_total_gradient;
+                    dpsiGrad = backward_result.yaw_rate_total_gradient;
                     (void)psiGrad;
                     (void)dpsiGrad;
 
@@ -573,7 +666,7 @@ namespace gcopter
 
             attachPenaltyFunctional(obj.times, obj.minco.getCoeffs(),
                                     obj.smoothEps, obj.integralRes, obj.config,
-                                    obj.flatness_config, obj.flatness_map, cost,
+                                    obj.yaw_smooth_, obj.flatness_model_, cost,
                                     obj.partialGradByTimes,
                                     obj.partialGradByCoeffs);
 
@@ -810,33 +903,41 @@ namespace gcopter
        public:
         GCOPTER_PolytopeSFC()
         {
-            flatness_map.reset(flatness_config.mass, flatness_config.gravity,
-                               flatness_config.horizontal_drag,
-                               flatness_config.vertical_drag,
-                               flatness_config.parasitic_drag,
-                               flatness_config.speed_smooth);
+            configure_from_file();
         }
 
-        inline void configure_flatness(double mass, double gravity,
-                                       double horizontal_drag,
-                                       double vertical_drag,
-                                       double parasitic_drag,
-                                       double speed_smooth,
-                                       double yaw_smooth)
+        inline void configure_from_file(const std::string &file_path = std::string())
         {
-            flatness_config.mass            = mass;
-            flatness_config.gravity         = gravity;
-            flatness_config.horizontal_drag = horizontal_drag;
-            flatness_config.vertical_drag   = vertical_drag;
-            flatness_config.parasitic_drag  = parasitic_drag;
-            flatness_config.speed_smooth    = speed_smooth;
-            flatness_config.yaw_smooth      = yaw_smooth;
-            flatness_map.reset(flatness_config.mass, flatness_config.gravity,
-                               flatness_config.horizontal_drag,
-                               flatness_config.vertical_drag,
-                               flatness_config.parasitic_drag,
-                               flatness_config.speed_smooth);
+            const std::string path =
+                file_path.empty() ? std::string(kDefaultGcopterConfigPath)
+                                  : file_path;
+
+            try
+            {
+                YAML::Node root = YAML::LoadFile(path);
+
+                if (root["gcopter"] && root["gcopter"]["yaw_smooth"])
+                {
+                    yaw_smooth_ = root["gcopter"]["yaw_smooth"].as<double>();
+                }
+                else if (root["yaw_smooth"])
+                {
+                    yaw_smooth_ = root["yaw_smooth"].as<double>();
+                }
+
+                flatness_model_.configure_from_file(path);
+                refresh_flatness_config();
+                config.configure_from_node(root);
+            }
+            catch (const YAML::Exception &ex)
+            {
+                throw std::runtime_error("Failed to load GCOPTER config from " +
+                                         path + ": " + ex.what());
+            }
         }
+
+        inline FlatnessModel &flatness() { return flatness_model_; }
+        inline const FlatnessModel &flatness() const { return flatness_model_; }
 
         inline bool setup_basic_trajectory(
             const Eigen::Matrix3d  &initialPVA,

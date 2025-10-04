@@ -23,6 +23,7 @@ ext_modules = [
         include_dirs=[pybind11.get_include(), PROJETCT_INCLUDE_DIR, EIGEN_INCLUDE_DIR],
         language="c++",
         extra_compile_args=["-std=c++20", "-O2"],
+        libraries=["yaml-cpp"],
     ),
 ]
 
