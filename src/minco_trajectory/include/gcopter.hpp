@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <type_traits>
 #include <vector>
@@ -44,6 +45,8 @@ namespace gcopter
 {
     inline constexpr const char *kDefaultGcopterConfigPath =
         "config/default_gcopter.yaml";
+    inline constexpr const char *kDefaultLbfgsConfigPath =
+        "config/lbfgs.yaml";
 
     struct CostConfig
     {
@@ -164,6 +167,83 @@ namespace gcopter
             if constexpr (requires(const FlatnessModel &model) { model.config(); })
             {
                 flatness_config_ = flatness_model_.config();
+            }
+        }
+
+        inline void set_default_lbfgs_params()
+        {
+            lbfgs_params                = lbfgs::lbfgs_parameter_t{};
+            lbfgs_params.mem_size       = 256;
+            lbfgs_params.past           = 3;
+            lbfgs_params.min_step       = 1.0e-20;
+            lbfgs_params.max_linesearch = 256;
+            lbfgs_params.g_epsilon      = 0.0;
+            lbfgs_params.s_curv_coeff   = 0.999999;
+        }
+
+        inline bool configure_lbfgs_from_node(const YAML::Node &root)
+        {
+            const YAML::Node node = root["lbfgs"].IsDefined()
+                                         ? root["lbfgs"]
+                                         : root;
+
+            if (!node || node.IsNull() || !node.IsMap())
+            {
+                return false;
+            }
+
+            bool assigned = false;
+
+            const auto assign_int = [&](const char *key, int &target) {
+                if (node[key])
+                {
+                    target   = node[key].as<int>();
+                    assigned = true;
+                }
+            };
+
+            const auto assign_double = [&](const char *key, double &target) {
+                if (node[key])
+                {
+                    target   = node[key].as<double>();
+                    assigned = true;
+                }
+            };
+
+            assign_int("mem_size", lbfgs_params.mem_size);
+            assign_int("past", lbfgs_params.past);
+            assign_int("max_iterations", lbfgs_params.max_iterations);
+            assign_int("max_linesearch", lbfgs_params.max_linesearch);
+            assign_double("min_step", lbfgs_params.min_step);
+            assign_double("max_step", lbfgs_params.max_step);
+            assign_double("g_epsilon", lbfgs_params.g_epsilon);
+            assign_double("delta", lbfgs_params.delta);
+            assign_double("f_dec_coeff", lbfgs_params.f_dec_coeff);
+            assign_double("s_curv_coeff", lbfgs_params.s_curv_coeff);
+            assign_double("cautious_factor", lbfgs_params.cautious_factor);
+            assign_double("machine_prec", lbfgs_params.machine_prec);
+
+            return assigned;
+        }
+
+        inline void configure_lbfgs_from_file(const std::string &file_path = std::string())
+        {
+            const std::string path = file_path.empty()
+                                         ? std::string(kDefaultLbfgsConfigPath)
+                                         : file_path;
+            try
+            {
+                YAML::Node root = YAML::LoadFile(path);
+                if (!configure_lbfgs_from_node(root))
+                {
+                    throw std::runtime_error(
+                        "LBFGS config does not contain any recognized keys");
+                }
+            }
+            catch (const YAML::Exception &ex)
+            {
+                throw std::runtime_error("Failed to load L-BFGS config from " +
+                                         path + ": " + ex.what());
             }
         }
 

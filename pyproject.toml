@@ -43,6 +43,7 @@ dev-dependencies = [
   "pre-commit",
   "pytest>=7.0",
   "pytest-cov",
+  "pyyaml",
 ]
 
 [tool.pytest.ini_options]
