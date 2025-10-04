@@ -18,10 +18,11 @@ ext_modules = [
             "src/minco_trajectory/src/bindings/root_finder_bindings.cpp",
             "src/minco_trajectory/src/bindings/geo_utils_bindings.cpp",
             "src/minco_trajectory/src/bindings/flatness_bindings.cpp",
+            "src/minco_trajectory/src/bindings/gcopter_bindings.cpp",
         ],
         include_dirs=[pybind11.get_include(), PROJETCT_INCLUDE_DIR, EIGEN_INCLUDE_DIR],
         language="c++",
-        extra_compile_args=["-std=c++17", "-O2"],
+        extra_compile_args=["-std=c++20", "-O2"],
     ),
 ]
 

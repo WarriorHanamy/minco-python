@@ -26,11 +26,13 @@
 #define GCOPTER_HPP
 
 #include <Eigen/Eigen>
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <iostream>
 #include <vector>
 
+#include "flatness.hpp"
 #include "geo_utils.hpp"
 #include "lbfgs.hpp"
 #include "minco.hpp"
@@ -80,16 +82,29 @@ namespace gcopter
         }
     };
 
+    struct FlatnessConfig
+    {
+        double mass            = 1.0;
+        double gravity         = 9.81;
+        double horizontal_drag = 0.0;
+        double vertical_drag   = 0.0;
+        double parasitic_drag  = 0.0;
+        double speed_smooth    = 1.0e-3;
+        double yaw_smooth      = 1.0e-6;
+    };
+
     class GCOPTER_PolytopeSFC
     {
        public:
         using PolyhedronV = Eigen::Matrix3Xd;
         using PolyhedronH = Eigen::MatrixX4d;
         using PolyhedraV  = std::vector<PolyhedronV>;
-        using PolyhedraH  = std::vector<PolyhedronH>;
+       using PolyhedraH  = std::vector<PolyhedronH>;
 
-       private:
+      private:
         minco::MINCO_S3NU minco;
+        FlatnessConfig        flatness_config;
+        flatness::FlatnessMap flatness_map;
 
         Eigen::Matrix3d headPVA;
         Eigen::Matrix3d tailPVA;
@@ -356,49 +371,32 @@ namespace gcopter
         static inline void attachPenaltyFunctional(
             const Eigen::VectorXd &T, const Eigen::MatrixX3d &coeffs,
             const double &smoothFactor, const int &integralResolution,
-            const CostConfig &config, double &cost, Eigen::VectorXd &gradT,
-            Eigen::MatrixX3d &gradC)
+            const CostConfig &config, const FlatnessConfig &flatness_config,
+            flatness::FlatnessMap &flatness_map, double &cost,
+            Eigen::VectorXd &gradT, Eigen::MatrixX3d &gradC)
         {
             const double velSqrMax  = config.v_max * config.v_max;
             const double omgxSqrMax = config.omg_x_max * config.omg_x_max;
             const double omgySqrMax = config.omg_y_max * config.omg_y_max;
             const double omgzSqrMax = config.omg_z_max * config.omg_z_max;
-
-            const double accSqrMax = config.acc_max * config.acc_max;
+            const double accSqrMax  = config.acc_max * config.acc_max;
             const double thrustMean =
                 0.5 * (config.thrust_min + config.thrust_max);
             const double thrustRadi =
                 0.5 * fabs(config.thrust_max - config.thrust_min);
             const double thrustSqrRadi = thrustRadi * thrustRadi;
+            const double weightVel     = config.vel_weight;
+            const double weightAcc     = config.acc_weight;
+            const double weightThrust  = config.thrust_weight;
+            const double yawSmooth     = flatness_config.yaw_smooth;
 
-            // const double weightPos = penaltyWeights(0);
-            const double    weightVel    = config.vel_weight;
-            const double    weightAcc    = config.acc_weight;
-            const double    weightThrust = config.thrust_weight;
-            Eigen::Vector3d pos, vel, acc, jer, sna;
-            Eigen::Vector3d totalGradPos, totalGradVel, totalGradAcc,
-                totalGradJer;
-            double          thr;
-            Eigen::Vector4d quat;
-            Eigen::Vector3d omg;
-            double          gradThr;
-            Eigen::Vector4d gradQuat;
-            Eigen::Vector3d gradPos, gradVel, gradAcc;
-            Eigen::Vector3d gradOmg;
+            const int    pieceNum     = T.size();
+            const double integralFrac = 1.0 / integralResolution;
 
             double                      step, alpha;
             double                      s1, s2, s3, s4, s5;
             Eigen::Matrix<double, 6, 1> beta0, beta1, beta2, beta3, beta4;
-            Eigen::Vector3d             outerNormal;
-            double                      violaVel, violaAcc;
-            double                      violaThrust;
-            double                      violaVelPena, violaAccPena;
-            double                      violaThrustPena;
-            double                      violaVelPenaD, violaAccPenaD;
-            double                      violaThrustPenaD;
-            double                      node, pena;
-            const int                   pieceNum     = T.size();
-            const double                integralFrac = 1.0 / integralResolution;
+
             for (int i = 0; i < pieceNum; i++)
             {
                 const Eigen::Matrix<double, 6, 3> &c =
@@ -423,93 +421,87 @@ namespace gcopter
                     beta3(3) = 6.0, beta3(4) = 24.0 * s1, beta3(5) = 60.0 * s2;
                     beta4(0) = 0.0, beta4(1) = 0.0, beta4(2) = 0.0,
                     beta4(3) = 0.0, beta4(4) = 24.0, beta4(5) = 120.0 * s1;
-                    pos = c.transpose() * beta0;
-                    vel = c.transpose() * beta1;
-                    acc = c.transpose() * beta2;
-                    jer = c.transpose() * beta3;
-                    sna = c.transpose() * beta4;
 
-                    // auto z = tailsitter_df::init(vel, acc, jer);
-                    tailsitter_df::Data::getInstance().df_backward_auto(
-                        vel, acc, jer, thr, omg);
+                    const Eigen::Vector3d vel = c.transpose() * beta1;
+                    const Eigen::Vector3d acc = c.transpose() * beta2;
+                    const Eigen::Vector3d jer = c.transpose() * beta3;
+                    const Eigen::Vector3d sna = c.transpose() * beta4;
 
-                    violaVel = vel.squaredNorm() - velSqrMax;
-                    violaAcc = acc.squaredNorm() - accSqrMax;
+                    const double velXYnorm = vel.head<2>().squaredNorm();
+                    const double psi = std::atan2(vel(1), vel(0));
+                    const double dpsi =
+                        (vel(0) * acc(1) - vel(1) * acc(0)) /
+                        std::max(velXYnorm + yawSmooth, 1e-12);
 
-                    /*
-                     * Additional knowledge about violation costs:
-                     *
-                     * 1. Angular velocity magnitude constraint:
-                     *    - Could use: vio_all_omg = omg.squaredNorm()
-                     *
-                     * 2. Tilt angle constraint:
-                     *    - cos_theta = 1.0 - 2.0 * (quat(1)^2 + quat(2)^2)
-                     *    - violaTheta = acos(cos_theta) - thetaMax
-                     *
-                     * 3. Thrust constraint:
-                     *    - Uses range cost: (T-T_max)(T-T_min)
-                     *    - Penalizes thrust outside [T_min, T_max]
-                     */
-                    violaThrust =
+                    double          thr;
+                    Eigen::Vector4d quat;
+                    Eigen::Vector3d omg;
+                    flatness_map.forward(vel, acc, jer, psi, dpsi, thr, quat,
+                                         omg);
+
+                    const double violaVel = vel.squaredNorm() - velSqrMax;
+                    const double violaAcc = acc.squaredNorm() - accSqrMax;
+                    const double violaThrust =
                         (thr - thrustMean) * (thr - thrustMean) - thrustSqrRadi;
-                    gradThr = 0.0;
-                    gradQuat.setZero();
-                    gradPos.setZero(), gradVel.setZero(), gradOmg.setZero();
-                    totalGradPos.setZero(), totalGradVel.setZero(),
-                        totalGradAcc.setZero(), totalGradJer.setZero();
-                    // all penalty terms
-                    pena = 0.0;
+
+                    double violaVelPena = 0.0, violaVelPenaD = 0.0;
+                    double violaAccPena = 0.0, violaAccPenaD = 0.0;
+                    double violaThrustPena = 0.0, violaThrustPenaD = 0.0;
+
+                    Eigen::Vector3d totalGradPos = Eigen::Vector3d::Zero();
+                    Eigen::Vector3d totalGradVel = Eigen::Vector3d::Zero();
+                    Eigen::Vector3d totalGradAcc = Eigen::Vector3d::Zero();
+                    Eigen::Vector3d totalGradJer = Eigen::Vector3d::Zero();
+
+                    Eigen::Vector3d velPenaltyGrad = Eigen::Vector3d::Zero();
+                    Eigen::Vector3d accPenaltyGrad = Eigen::Vector3d::Zero();
+                    Eigen::Vector3d jerPenaltyGrad = Eigen::Vector3d::Zero();
+                    double          gradThr        = 0.0;
+                    Eigen::Vector4d gradQuat       = Eigen::Vector4d::Zero();
+                    Eigen::Vector3d gradOmg        = Eigen::Vector3d::Zero();
+
+                    double pena = 0.0;
 
                     if (smoothedL1(violaVel, smoothFactor, violaVelPena,
                                    violaVelPenaD))
                     {
-                        // cost type is v^2 - v_max^2
-                        gradVel += weightVel * violaVelPenaD * 2.0 * vel;
+                        velPenaltyGrad += weightVel * violaVelPenaD * 2.0 * vel;
                         pena += weightVel * violaVelPena;
-                        totalGradVel += gradVel;
                     }
                     if (smoothedL1(violaAcc, smoothFactor, violaAccPena,
                                    violaAccPenaD))
                     {
-                        // cost type is v^2 - v_max^2
-                        gradAcc += weightAcc * violaAccPenaD * 2.0 * acc;
-                        pena += weightAcc * violaVelPena;
-                        totalGradAcc += gradAcc;
+                        accPenaltyGrad += weightAcc * violaAccPenaD * 2.0 * acc;
+                        pena += weightAcc * violaAccPena;
                     }
 
-                    double violaOmgX     = omg(0) * omg(0) - omgxSqrMax;
-                    double violaOmgY     = omg(1) * omg(1) - omgySqrMax;
-                    double violaOmgZ     = omg(2) * omg(2) - omgzSqrMax;
-                    double violaOmgXPena = 0.0, violaOmgYPena = 0.0,
-                           violaOmgZPena  = 0.0;
-                    double violaOmgXPenaD = 0.0, violaOmgYPenaD = 0.0,
-                           violaOmgZPenaD = 0.0;
-                    double gradOmgx = 0, gradOmgy = 0, gradOmgz = 0;
-                    double omg_x = omg.x(), omg_y = omg.y(), omg_z = omg.z();
-                    smoothedL1(violaOmgX, smoothFactor, violaOmgXPena,
-                               violaOmgXPenaD);
-                    smoothedL1(violaOmgY, smoothFactor, violaOmgYPena,
-                               violaOmgYPenaD);
-                    smoothedL1(violaOmgZ, smoothFactor, violaOmgZPena,
-                               violaOmgZPenaD);
-                    {
-                        gradOmgx +=
-                            config.omg_x_weight * violaOmgXPenaD * 2.0 * omg_x;
-                        gradOmgy +=
-                            config.omg_y_weight * violaOmgYPenaD * 2.0 * omg_y;
-                        gradOmgz +=
-                            config.omg_z_weight * violaOmgZPenaD * 2.0 * omg_z;
-                        gradOmg = Eigen::Vector3d(gradOmgx, gradOmgy, gradOmgz);
-                        pena += config.omg_x_weight * violaOmgXPena;
-                        pena += config.omg_y_weight * violaOmgYPena;
-                        pena += config.omg_z_weight * violaOmgZPena;
+                    double violaOmgXPena = 0.0, violaOmgXPenaD = 0.0;
+                    double violaOmgYPena = 0.0, violaOmgYPenaD = 0.0;
+                    double violaOmgZPena = 0.0, violaOmgZPenaD = 0.0;
+                    const double violaOmgX = omg(0) * omg(0) - omgxSqrMax;
+                    const double violaOmgY = omg(1) * omg(1) - omgySqrMax;
+                    const double violaOmgZ = omg(2) * omg(2) - omgzSqrMax;
 
-                        Eigen::Matrix3d Jv, Ja, Jj;
-                        tailsitter_df::Data::getInstance().jacobian_omega(
-                            Jv, Ja, Jj);
-                        totalGradVel += Jv * gradOmg;
-                        totalGradAcc += Ja * gradOmg;
-                        totalGradJer += Jj * gradOmg;
+                    if (smoothedL1(violaOmgX, smoothFactor, violaOmgXPena,
+                                   violaOmgXPenaD))
+                    {
+                        gradOmg(0) += config.omg_x_weight * violaOmgXPenaD *
+                                      2.0 * omg(0);
+                        pena += config.omg_x_weight * violaOmgXPena;
+                    }
+                    if (smoothedL1(violaOmgY, smoothFactor, violaOmgYPena,
+                                   violaOmgYPenaD))
+                    {
+                        gradOmg(1) += config.omg_y_weight * violaOmgYPenaD *
+                                      2.0 * omg(1);
+                        pena += config.omg_y_weight * violaOmgYPena;
+                    }
+                    if (smoothedL1(violaOmgZ, smoothFactor, violaOmgZPena,
+                                   violaOmgZPenaD))
+                    {
+                        gradOmg(2) += config.omg_z_weight * violaOmgZPenaD *
+                                      2.0 * omg(2);
+                        pena += config.omg_z_weight * violaOmgZPena;
                     }
 
                     if (smoothedL1(violaThrust, smoothFactor, violaThrustPena,
@@ -518,16 +510,29 @@ namespace gcopter
                         gradThr += weightThrust * violaThrustPenaD * 2.0 *
                                    (thr - thrustMean);
                         pena += weightThrust * violaThrustPena;
-
-                        Eigen::Vector3d tmp_gv, tmp_ga, tmp_gj;
-                        tailsitter_df::Data::getInstance().jacobian_at(
-                            tmp_gv, tmp_ga, tmp_gj);
-                        totalGradVel += tmp_gv * gradThr;
-                        totalGradAcc += tmp_ga * gradThr;
-                        totalGradJer += tmp_gj * gradThr;
                     }
 
-                    node  = (j == 0 || j == integralResolution) ? 0.5 : 1.0;
+                    Eigen::Vector3d backPos, backVel, backAcc, backJer;
+                    double          psiGrad = 0.0;
+                    double          dpsiGrad = 0.0;
+                    flatness_map.backward(Eigen::Vector3d::Zero(),
+                                          velPenaltyGrad, gradThr, gradQuat,
+                                          gradOmg, backPos, backVel, backAcc,
+                                          backJer, psiGrad, dpsiGrad);
+                    (void)psiGrad;
+                    (void)dpsiGrad;
+
+                    totalGradPos += backPos;
+                    totalGradVel += backVel;
+                    totalGradAcc += backAcc;
+                    totalGradJer += backJer;
+
+                    totalGradAcc += accPenaltyGrad;
+                    totalGradJer += jerPenaltyGrad;
+
+                    const double node  = (j == 0 || j == integralResolution)
+                                              ? 0.5
+                                              : 1.0;
                     alpha = j * integralFrac;
                     gradC.block<6, 3>(i * 6, 0) +=
                         (beta0 * totalGradPos.transpose() +
@@ -543,8 +548,6 @@ namespace gcopter
                     cost += node * step * pena;
                 }
             }
-
-            return;
         }
 
         static inline double costFunctional(void *ptr, const Eigen::VectorXd &x,
@@ -561,8 +564,6 @@ namespace gcopter
 
             forwardT(tau, obj.times);
             forwardP(xi, obj.vPolyIdx, obj.vPolytopes, obj.points);
-            // TODO actually, this is not correct.
-            tailsitter_df::Data::getInstance().reset();
 
             double cost;
             obj.minco.setParameters(obj.points, obj.times);
@@ -572,7 +573,8 @@ namespace gcopter
 
             attachPenaltyFunctional(obj.times, obj.minco.getCoeffs(),
                                     obj.smoothEps, obj.integralRes, obj.config,
-                                    cost, obj.partialGradByTimes,
+                                    obj.flatness_config, obj.flatness_map, cost,
+                                    obj.partialGradByTimes,
                                     obj.partialGradByCoeffs);
 
             obj.minco.propogateGrad(obj.partialGradByCoeffs,
@@ -806,6 +808,36 @@ namespace gcopter
         }
 
        public:
+        GCOPTER_PolytopeSFC()
+        {
+            flatness_map.reset(flatness_config.mass, flatness_config.gravity,
+                               flatness_config.horizontal_drag,
+                               flatness_config.vertical_drag,
+                               flatness_config.parasitic_drag,
+                               flatness_config.speed_smooth);
+        }
+
+        inline void configure_flatness(double mass, double gravity,
+                                       double horizontal_drag,
+                                       double vertical_drag,
+                                       double parasitic_drag,
+                                       double speed_smooth,
+                                       double yaw_smooth)
+        {
+            flatness_config.mass            = mass;
+            flatness_config.gravity         = gravity;
+            flatness_config.horizontal_drag = horizontal_drag;
+            flatness_config.vertical_drag   = vertical_drag;
+            flatness_config.parasitic_drag  = parasitic_drag;
+            flatness_config.speed_smooth    = speed_smooth;
+            flatness_config.yaw_smooth      = yaw_smooth;
+            flatness_map.reset(flatness_config.mass, flatness_config.gravity,
+                               flatness_config.horizontal_drag,
+                               flatness_config.vertical_drag,
+                               flatness_config.parasitic_drag,
+                               flatness_config.speed_smooth);
+        }
+
         inline bool setup_basic_trajectory(
             const Eigen::Matrix3d  &initialPVA,
             const Eigen::Matrix3d  &terminalPVA,

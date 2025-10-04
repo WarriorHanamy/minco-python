@@ -16,4 +16,5 @@ PYBIND11_MODULE(minco, m)
     bind_root_finder(m);
     bind_geo_utils(m);
     bind_flatness(m);
+    bind_gcopter(m);
 }
