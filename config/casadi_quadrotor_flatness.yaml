@@ -1,0 +1,9 @@
+# Physical parameters embedded into the CasADi-generated quadrotor flatness model.
+# Run `uv run tools/build_casadi_flatness` after editing values to regenerate C sources.
+flatness:
+  mass: 1.1
+  gravity: 9.81
+  horizontal_drag: 0.05
+  vertical_drag: 0.05
+  parasitic_drag: 0.01
+  speed_smooth: 0.001

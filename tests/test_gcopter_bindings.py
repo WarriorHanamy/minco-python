@@ -19,43 +19,66 @@ def visualize_gcopter_trajectory(
     Visualize GCOPTER trajectory with two subplots:
     - Left: 3D trajectory with start (green) and end (red) markers
     - Right: Speed profile over time
-    
+
     Args:
         trajectory: GCOPTER trajectory object
         time_samples: Optional array of time samples, defaults to 500 points
     """
     if time_samples is None:
         time_samples = np.linspace(0.0, trajectory.total_duration, 500)
-    
+
     positions = np.array([trajectory.get_pos(t) for t in time_samples])
     vels = np.array([trajectory.get_vel(t) for t in time_samples])
-    
+
     # Create figure with two subplots
     fig = plt.figure(figsize=(12, 5))
-    
+
     # First subplot: 3D trajectory
     ax1 = fig.add_subplot(121, projection="3d")
     ax1.view_init(elev=90, azim=0)
-    ax1.plot(positions[:, 0], positions[:, 1], positions[:, 2], 'b-', linewidth=2, label='Trajectory')
+    ax1.plot(
+        positions[:, 0],
+        positions[:, 1],
+        positions[:, 2],
+        "b-",
+        linewidth=2,
+        label="Trajectory",
+    )
     # Mark start point (green solid ball)
-    ax1.scatter(positions[0, 0], positions[0, 1], positions[0, 2], c='green', s=100, marker='o', label='Start')
-    # Mark end point (red solid ball) 
-    ax1.scatter(positions[-1, 0], positions[-1, 1], positions[-1, 2], c='red', s=100, marker='o', label='End')
+    ax1.scatter(
+        positions[0, 0],
+        positions[0, 1],
+        positions[0, 2],
+        c="green",
+        s=100,
+        marker="o",
+        label="Start",
+    )
+    # Mark end point (red solid ball)
+    ax1.scatter(
+        positions[-1, 0],
+        positions[-1, 1],
+        positions[-1, 2],
+        c="red",
+        s=100,
+        marker="o",
+        label="End",
+    )
     ax1.set_title("GCOPTER Trajectory")
     ax1.set_xlabel("X [m]")
     ax1.set_ylabel("Y [m]")
     ax1.set_zlabel("Z [m]")
     ax1.legend()
-    
+
     # Second subplot: Velocity profile
     ax2 = fig.add_subplot(122)
     speed = np.linalg.norm(vels, axis=1)
-    ax2.plot(time_samples, speed, 'r-', linewidth=2)
+    ax2.plot(time_samples, speed, "r-", linewidth=2)
     ax2.set_xlabel("Time [s]")
     ax2.set_ylabel("Speed [m/s]")
     ax2.set_title("GCOPTER Speed Profile")
     ax2.grid(True)
-    
+
     plt.tight_layout()
     plt.show()
     plt.close(fig)

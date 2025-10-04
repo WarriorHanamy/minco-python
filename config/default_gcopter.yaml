@@ -7,21 +7,22 @@ flatness:
   parasitic_drag: 0.01
   speed_smooth: 0.001
 cost:
-  v_max: 5.0
+  v_max: 10.0
   omg_x_max: 1.0
   omg_y_max: 2.0
   omg_z_max: 1.0
-  acc_max: 50.0
+  acc_max: 10.0
   thrust_min: -20.0
   thrust_max: 20.0
-  pos_weight: 1.0
-  vel_weight: 0.0
+  pos_weight: 10000.0
+  vel_weight: 1000.0
   acc_weight: 0.0
-  omg_x_weight: 0.0
-  omg_y_weight: 0.0
+  omg_x_weight: 1000.0
+  omg_y_weight: 1000.0
   omg_z_weight: 0.0
   thrust_weight: 0.0
-  time_weight: 0.0
+  time_weight: 1000.0
   omg_consistent_weight: 0.0
 gcopter:
   yaw_smooth: 1.0e-6
+  lbfgs_config_path: lbfgs.yaml

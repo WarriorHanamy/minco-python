@@ -988,6 +988,8 @@ namespace gcopter
 
         inline void configure_from_file(const std::string &file_path = std::string())
         {
+            set_default_lbfgs_params();
+
             const std::string path =
                 file_path.empty() ? std::string(kDefaultGcopterConfigPath)
                                   : file_path;
@@ -1005,7 +1007,55 @@ namespace gcopter
                     yaw_smooth_ = root["yaw_smooth"].as<double>();
                 }
 
-                flatness_model_.configure_from_file(path);
+                std::string lbfgs_path_override;
+                if (root["gcopter"] && root["gcopter"]["lbfgs_config_path"])
+                {
+                    lbfgs_path_override =
+                        root["gcopter"]["lbfgs_config_path"].as<std::string>();
+                }
+                else if (root["lbfgs_config_path"])
+                {
+                    lbfgs_path_override =
+                        root["lbfgs_config_path"].as<std::string>();
+                }
+
+                if (!lbfgs_path_override.empty())
+                {
+                    std::filesystem::path resolved(lbfgs_path_override);
+                    if (!resolved.is_absolute())
+                    {
+                        resolved = std::filesystem::path(path).parent_path() /
+                                   resolved;
+                    }
+                    lbfgs_path_override = resolved.lexically_normal().string();
+                }
+
+                const bool lbfgs_loaded = configure_lbfgs_from_node(root);
+                if (!lbfgs_loaded)
+                {
+                    configure_lbfgs_from_file(lbfgs_path_override);
+                }
+
+                if constexpr (requires(FlatnessModel &model, const std::string &p) {
+                                  model.configure_from_file(p);
+                              })
+                {
+                    if constexpr (requires { FlatnessModel::kRuntimeConfigurable; })
+                    {
+                        if (FlatnessModel::kRuntimeConfigurable)
+                        {
+                            flatness_model_.configure_from_file(path);
+                        }
+                        else
+                        {
+                            flatness_model_.configure_from_file(std::string());
+                        }
+                    }
+                    else
+                    {
+                        flatness_model_.configure_from_file(path);
+                    }
+                }
                 refresh_flatness_config();
                 config.configure_from_node(root);
             }
@@ -1068,8 +1118,9 @@ namespace gcopter
                 vPolytopes.push_back(cur_v0_and_VB);
             }
             vPolyIdx.resize(size_corridor);
-            // if we don't constrain the pos error, then the hPolyIdx is useless
             // hPolyIdx.resize(size_corridor);
+
+            // if we don't constrain the pos error, then the hPolyIdx is useless
             for (int i = 0; i < size_corridor; i++)
             {
                 // hPolyIdx(i) = i;
@@ -1101,13 +1152,7 @@ namespace gcopter
             backwardP(points, vPolyIdx, vPolytopes, xi);
 
             double minCostFunctional;
-            lbfgs_params.mem_size       = 256;
-            lbfgs_params.past           = 3;
-            lbfgs_params.min_step       = 1.0e-20;
-            lbfgs_params.max_linesearch = 256;
-            lbfgs_params.g_epsilon      = 0.0;
-            lbfgs_params.delta          = relCostTol;
-            lbfgs_params.s_curv_coeff   = 0.999999;
+            lbfgs_params.delta = relCostTol;
 
             int ret = lbfgs::lbfgs_optimize(
                 x, minCostFunctional, &GCOPTER_PolytopeSFC::costFunctional,

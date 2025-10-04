@@ -1,9 +1,15 @@
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
-import pybind11
 import os
 import subprocess
 import sys
+
+try:
+    import pybind11  # type: ignore
+
+    PYBIND11_INCLUDE_DIR = pybind11.get_include()
+except ModuleNotFoundError:
+    PYBIND11_INCLUDE_DIR = "/usr/include/pybind11"
 
 EIGEN_INCLUDE_DIR = "/usr/include/eigen3"
 PROJETCT_INCLUDE_DIR = "src/minco_trajectory/include"
@@ -19,8 +25,9 @@ ext_modules = [
             "src/minco_trajectory/src/bindings/geo_utils_bindings.cpp",
             "src/minco_trajectory/src/bindings/flatness_bindings.cpp",
             "src/minco_trajectory/src/bindings/gcopter_bindings.cpp",
+            "src/minco_trajectory/src/casadi_generated/quadrotor_flatness.c",
         ],
-        include_dirs=[pybind11.get_include(), PROJETCT_INCLUDE_DIR, EIGEN_INCLUDE_DIR],
+        include_dirs=[PYBIND11_INCLUDE_DIR, PROJETCT_INCLUDE_DIR, EIGEN_INCLUDE_DIR],
         language="c++",
         extra_compile_args=["-std=c++20", "-O2"],
         libraries=["yaml-cpp"],
