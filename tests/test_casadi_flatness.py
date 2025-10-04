@@ -3,14 +3,54 @@ CasADi implementation of flatness forward function with automatic differentiatio
 This implementation replicates the functionality from flatness.hpp using CasADi symbolic computation.
 """
 
-import numpy as np
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Dict, Tuple
+
 import casadi as ca
+import minco
+import numpy as np
+import pytest
+from numpy.typing import NDArray
+
+
+Array = NDArray[np.float64]
+
+
+def _write_flatness_config(tmp_path: Path, params: Dict[str, float]) -> Path:
+    lines = ["flatness:"]
+    for key in (
+        "mass",
+        "gravity",
+        "horizontal_drag",
+        "vertical_drag",
+        "parasitic_drag",
+        "speed_smooth",
+    ):
+        lines.append(f"  {key}: {params[key]}")
+
+    path = tmp_path / "flatness.yaml"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def _create_mappers(
+    tmp_path: Path, params: Dict[str, float]
+) -> Tuple[CasadiFlatnessMap, minco.flatness.FlatnessMap]:
+    config_path = _write_flatness_config(tmp_path, params)
+    casadi_mapper = CasadiFlatnessMap()
+    casadi_mapper.reset(**params)
+
+    reference_mapper = minco.flatness.FlatnessMap()
+    reference_mapper.configure_from_file(str(config_path))
+    return casadi_mapper, reference_mapper
 
 
 class CasadiFlatnessMap:
     """CasADi implementation of the flatness mapping with automatic differentiation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.mass = 1.0
         self.grav = 9.81
         self.dh = 0.0
@@ -19,19 +59,19 @@ class CasadiFlatnessMap:
         self.veps = 1.0e-3
 
         # Create symbolic variables for forward computation
-        self.vel_sym = ca.SX.sym('vel', 3)
-        self.acc_sym = ca.SX.sym('acc', 3)
-        self.jer_sym = ca.SX.sym('jer', 3)
-        self.psi_sym = ca.SX.sym('psi')
-        self.dpsi_sym = ca.SX.sym('dpsi')
+        self.vel_sym = ca.SX.sym("vel", 3)
+        self.acc_sym = ca.SX.sym("acc", 3)
+        self.jer_sym = ca.SX.sym("jer", 3)
+        self.psi_sym = ca.SX.sym("psi")
+        self.dpsi_sym = ca.SX.sym("dpsi")
 
         # Create symbolic variables for parameters
-        self.mass_sym = ca.SX.sym('mass')
-        self.grav_sym = ca.SX.sym('grav')
-        self.dh_sym = ca.SX.sym('dh')
-        self.dv_sym = ca.SX.sym('dv')
-        self.cp_sym = ca.SX.sym('cp')
-        self.veps_sym = ca.SX.sym('veps')
+        self.mass_sym = ca.SX.sym("mass")
+        self.grav_sym = ca.SX.sym("grav")
+        self.dh_sym = ca.SX.sym("dh")
+        self.dv_sym = ca.SX.sym("dv")
+        self.cp_sym = ca.SX.sym("cp")
+        self.veps_sym = ca.SX.sym("veps")
 
         # Build forward function
         self.forward_func = self._build_forward_function()
@@ -39,7 +79,15 @@ class CasadiFlatnessMap:
         # Build backward function using automatic differentiation
         self.backward_func = self._build_backward_function()
 
-    def reset(self, mass, gravity, horizontal_drag, vertical_drag, parasitic_drag, speed_smooth):
+    def reset(
+        self,
+        mass: float,
+        gravity: float,
+        horizontal_drag: float,
+        vertical_drag: float,
+        parasitic_drag: float,
+        speed_smooth: float,
+    ) -> None:
         """Reset the model parameters."""
         self.mass = mass
         self.grav = gravity
@@ -48,7 +96,7 @@ class CasadiFlatnessMap:
         self.cp = parasitic_drag
         self.veps = speed_smooth
 
-    def _build_forward_function(self):
+    def _build_forward_function(self) -> ca.Function:
         """Build the forward function using CasADi symbolic computation."""
         v0, v1, v2 = self.vel_sym[0], self.vel_sym[1], self.vel_sym[2]
         a0, a1, a2 = self.acc_sym[0], self.acc_sym[1], self.acc_sym[2]
@@ -65,7 +113,7 @@ class CasadiFlatnessMap:
         veps = self.veps_sym
 
         # Implement the forward computation from flatness.hpp:229-303
-        cp_term = ca.sqrt(v0*v0 + v1*v1 + v2*v2 + veps)
+        cp_term = ca.sqrt(v0 * v0 + v1 * v1 + v2 * v2 + veps)
         w_term = 1.0 + cp * cp_term
         w0 = w_term * v0
         w1 = w_term * v1
@@ -143,25 +191,40 @@ class CasadiFlatnessMap:
 
         # Create the forward function
         inputs = ca.vertcat(
-            self.vel_sym, self.acc_sym, self.jer_sym,
-            self.psi_sym, self.dpsi_sym,
-            self.mass_sym, self.grav_sym, self.dh_sym,
-            self.dv_sym, self.cp_sym, self.veps_sym
+            self.vel_sym,
+            self.acc_sym,
+            self.jer_sym,
+            self.psi_sym,
+            self.dpsi_sym,
+            self.mass_sym,
+            self.grav_sym,
+            self.dh_sym,
+            self.dv_sym,
+            self.cp_sym,
+            self.veps_sym,
         )
         outputs = ca.vertcat(thrust, quat, omg)
 
-        return ca.Function('forward', [inputs], [outputs],
-                         ['inputs'], ['outputs'])
+        return ca.Function("forward", [inputs], [outputs], ["inputs"], ["outputs"])
 
-    def _build_backward_function(self):
+    def _build_backward_function(self) -> ca.Function:
         """Build the backward function using CasADi automatic differentiation."""
         # Get the forward outputs
-        forward_outputs = self.forward_func(ca.vertcat(
-            self.vel_sym, self.acc_sym, self.jer_sym,
-            self.psi_sym, self.dpsi_sym,
-            self.mass_sym, self.grav_sym, self.dh_sym,
-            self.dv_sym, self.cp_sym, self.veps_sym
-        ))
+        forward_outputs = self.forward_func(
+            ca.vertcat(
+                self.vel_sym,
+                self.acc_sym,
+                self.jer_sym,
+                self.psi_sym,
+                self.dpsi_sym,
+                self.mass_sym,
+                self.grav_sym,
+                self.dh_sym,
+                self.dv_sym,
+                self.cp_sym,
+                self.veps_sym,
+            )
+        )
 
         # Extract thrust, quaternion, and angular velocity
         thrust = forward_outputs[0]
@@ -169,25 +232,29 @@ class CasadiFlatnessMap:
         omg = forward_outputs[5:8]
 
         # Create symbolic variables for gradients
-        pos_grad_sym = ca.SX.sym('pos_grad', 3)
-        vel_grad_sym = ca.SX.sym('vel_grad', 3)
-        thr_grad_sym = ca.SX.sym('thr_grad')
-        quat_grad_sym = ca.SX.sym('quat_grad', 4)
-        omg_grad_sym = ca.SX.sym('omg_grad', 3)
+        pos_grad_sym = ca.SX.sym("pos_grad", 3)
+        vel_grad_sym = ca.SX.sym("vel_grad", 3)
+        thr_grad_sym = ca.SX.sym("thr_grad")
+        quat_grad_sym = ca.SX.sym("quat_grad", 4)
+        omg_grad_sym = ca.SX.sym("omg_grad", 3)
 
         # Compute the total gradient using automatic differentiation
         # The gradient of the forward outputs w.r.t. inputs
-        jac_forward = ca.jacobian(forward_outputs,
-                                 ca.vertcat(self.vel_sym, self.acc_sym, self.jer_sym,
-                                           self.psi_sym, self.dpsi_sym))
+        jac_forward = ca.jacobian(
+            forward_outputs,
+            ca.vertcat(
+                self.vel_sym, self.acc_sym, self.jer_sym, self.psi_sym, self.dpsi_sym
+            ),
+        )
 
         # The backward gradients we want to compute
         output_grad = ca.vertcat(thr_grad_sym, quat_grad_sym, omg_grad_sym)
 
         # Compute the total gradients using the chain rule
         # total_grad = jac_forward^T * output_grad + input_grad
-        input_grad = ca.vertcat(vel_grad_sym, ca.SX.zeros(3), ca.SX.zeros(3),
-                               ca.SX.zeros(1), ca.SX.zeros(1))
+        input_grad = ca.vertcat(
+            vel_grad_sym, ca.SX.zeros(3), ca.SX.zeros(3), ca.SX.zeros(1), ca.SX.zeros(1)
+        )
         total_grad = ca.mtimes(jac_forward.T, output_grad) + input_grad
 
         # Extract the specific gradients we need
@@ -202,256 +269,213 @@ class CasadiFlatnessMap:
 
         # Create the backward function
         inputs = ca.vertcat(
-            self.vel_sym, self.acc_sym, self.jer_sym,
-            self.psi_sym, self.dpsi_sym,
-            self.mass_sym, self.grav_sym, self.dh_sym,
-            self.dv_sym, self.cp_sym, self.veps_sym,
-            pos_grad_sym, vel_grad_sym, thr_grad_sym,
-            quat_grad_sym, omg_grad_sym
+            self.vel_sym,
+            self.acc_sym,
+            self.jer_sym,
+            self.psi_sym,
+            self.dpsi_sym,
+            self.mass_sym,
+            self.grav_sym,
+            self.dh_sym,
+            self.dv_sym,
+            self.cp_sym,
+            self.veps_sym,
+            pos_grad_sym,
+            vel_grad_sym,
+            thr_grad_sym,
+            quat_grad_sym,
+            omg_grad_sym,
         )
         outputs = ca.vertcat(
-            pos_total_grad, vel_total_grad, acc_total_grad,
-            jer_total_grad, psi_total_grad, dpsi_total_grad
+            pos_total_grad,
+            vel_total_grad,
+            acc_total_grad,
+            jer_total_grad,
+            psi_total_grad,
+            dpsi_total_grad,
         )
 
-        return ca.Function('backward', [inputs], [outputs],
-                         ['inputs'], ['outputs'])
+        return ca.Function("backward", [inputs], [outputs], ["inputs"], ["outputs"])
 
-    def forward(self, vel, acc, jer, psi, dpsi):
+    def forward(
+        self,
+        vel: Array,
+        acc: Array,
+        jer: Array,
+        psi: float,
+        dpsi: float,
+    ) -> Tuple[float, Array, Array]:
         """Forward computation."""
-        inputs = np.concatenate([
-            vel, acc, jer, [psi, dpsi],
-            [self.mass, self.grav, self.dh, self.dv, self.cp, self.veps]
-        ])
+        inputs = np.concatenate(
+            [
+                vel,
+                acc,
+                jer,
+                [psi, dpsi],
+                [self.mass, self.grav, self.dh, self.dv, self.cp, self.veps],
+            ]
+        )
 
         result = self.forward_func(inputs)
         thrust = float(result[0])
-        quat = np.array(result[1:5]).flatten()
-        omg = np.array(result[5:8]).flatten()
+        quat = np.array(result[1:5], dtype=float).flatten()
+        omg = np.array(result[5:8], dtype=float).flatten()
 
         return thrust, quat, omg
 
-    def backward(self, pos_grad, vel_grad, thr_grad, quat_grad, omg_grad,
-                vel, acc, jer, psi, dpsi):
+    def backward(
+        self,
+        pos_grad: Array,
+        vel_grad: Array,
+        thr_grad: float,
+        quat_grad: Array,
+        omg_grad: Array,
+        vel: Array,
+        acc: Array,
+        jer: Array,
+        psi: float,
+        dpsi: float,
+    ) -> Tuple[Array, Array, Array, Array, float, float]:
         """Backward computation using automatic differentiation."""
-        inputs = np.concatenate([
-            vel, acc, jer, [psi, dpsi],
-            [self.mass, self.grav, self.dh, self.dv, self.cp, self.veps],
-            pos_grad, vel_grad, [thr_grad], quat_grad, omg_grad
-        ])
+        inputs = np.concatenate(
+            [
+                vel,
+                acc,
+                jer,
+                [psi, dpsi],
+                [self.mass, self.grav, self.dh, self.dv, self.cp, self.veps],
+                pos_grad,
+                vel_grad,
+                [thr_grad],
+                quat_grad,
+                omg_grad,
+            ]
+        )
 
         result = self.backward_func(inputs)
 
-        pos_total_grad = np.array(result[0:3]).flatten()
-        vel_total_grad = np.array(result[3:6]).flatten()
-        acc_total_grad = np.array(result[6:9]).flatten()
-        jer_total_grad = np.array(result[9:12]).flatten()
+        pos_total_grad = np.array(result[0:3], dtype=float).flatten()
+        vel_total_grad = np.array(result[3:6], dtype=float).flatten()
+        acc_total_grad = np.array(result[6:9], dtype=float).flatten()
+        jer_total_grad = np.array(result[9:12], dtype=float).flatten()
         psi_total_grad = float(result[12])
         dpsi_total_grad = float(result[13])
 
-        return (pos_total_grad, vel_total_grad, acc_total_grad,
-                jer_total_grad, psi_total_grad, dpsi_total_grad)
-
-
-def test_casadi_flatness_forward():
-    """Test the CasADi forward function against the original implementation."""
-    # Create both implementations
-    casadi_mapper = CasadiFlatnessMap()
-
-    # Test parameters
-    test_params = {
-        'mass': 1.0,
-        'gravity': 9.81,
-        'horizontal_drag': 0.1,
-        'vertical_drag': 0.1,
-        'parasitic_drag': 0.01,
-        'speed_smooth': 1e-3
-    }
-
-    casadi_mapper.reset(**test_params)
-
-    # Test case 1: Zero motion
-    print("Test 1: Zero motion")
-    vel = np.zeros(3)
-    acc = np.zeros(3)
-    jer = np.zeros(3)
-    psi = 0.0
-    dpsi = 0.0
-
-    thrust_casadi, quat_casadi, omg_casadi = casadi_mapper.forward(vel, acc, jer, psi, dpsi)
-
-    print(f"CasADi thrust: {thrust_casadi:.6f}")
-    print(f"CasADi quat: {quat_casadi}")
-    print(f"CasADi omg: {omg_casadi}")
-
-    # Test case 2: Forward motion
-    print("\nTest 2: Forward motion")
-    vel = np.array([1.0, 0.0, 0.0])
-    acc = np.array([0.1, 0.0, 0.0])
-    jer = np.array([0.01, 0.0, 0.0])
-    psi = 0.0
-    dpsi = 0.0
-
-    thrust_casadi, quat_casadi, omg_casadi = casadi_mapper.forward(vel, acc, jer, psi, dpsi)
-
-    print(f"CasADi thrust: {thrust_casadi:.6f}")
-    print(f"CasADi quat: {quat_casadi}")
-    print(f"CasADi omg: {omg_casadi}")
-
-    # Test case 3: Complex motion
-    print("\nTest 3: Complex motion")
-    vel = np.array([0.5, 0.3, 0.1])
-    acc = np.array([0.2, 0.1, 0.05])
-    jer = np.array([0.01, 0.005, 0.002])
-    psi = 0.5
-    dpsi = 0.1
-
-    thrust_casadi, quat_casadi, omg_casadi = casadi_mapper.forward(vel, acc, jer, psi, dpsi)
-
-    print(f"CasADi thrust: {thrust_casadi:.6f}")
-    print(f"CasADi quat: {quat_casadi}")
-    print(f"CasADi omg: {omg_casadi}")
-
-
-def test_casadi_flatness_backward():
-    """Test the CasADi backward function."""
-    casadi_mapper = CasadiFlatnessMap()
-
-    # Test parameters
-    test_params = {
-        'mass': 1.0,
-        'gravity': 9.81,
-        'horizontal_drag': 0.1,
-        'vertical_drag': 0.1,
-        'parasitic_drag': 0.01,
-        'speed_smooth': 1e-3
-    }
-
-    casadi_mapper.reset(**test_params)
-
-    # Test inputs
-    vel = np.array([0.5, 0.3, 0.1])
-    acc = np.array([0.2, 0.1, 0.05])
-    jer = np.array([0.01, 0.005, 0.002])
-    psi = 0.5
-    dpsi = 0.1
-
-    # Test gradients
-    pos_grad = np.array([0.1, 0.2, 0.3])
-    vel_grad = np.array([0.05, 0.1, 0.15])
-    thr_grad = 0.5
-    quat_grad = np.array([0.01, 0.02, 0.03, 0.04])
-    omg_grad = np.array([0.1, 0.2, 0.3])
-
-    # Compute backward gradients
-    gradients = casadi_mapper.backward(
-        pos_grad, vel_grad, thr_grad, quat_grad, omg_grad,
-        vel, acc, jer, psi, dpsi
-    )
-
-    pos_total_grad, vel_total_grad, acc_total_grad, \
-    jer_total_grad, psi_total_grad, dpsi_total_grad = gradients
-
-    print("Backward gradients:")
-    print(f"pos_total_grad: {pos_total_grad}")
-    print(f"vel_total_grad: {vel_total_grad}")
-    print(f"acc_total_grad: {acc_total_grad}")
-    print(f"jer_total_grad: {jer_total_grad}")
-    print(f"psi_total_grad: {psi_total_grad}")
-    print(f"dpsi_total_grad: {dpsi_total_grad}")
-
-
-def compare_with_original():
-    """Compare CasADi implementation with original C++ implementation."""
-    try:
-        import minco
-
-        # Create both implementations
-        original_mapper = minco.flatness.FlatnessMap()
-        casadi_mapper = CasadiFlatnessMap()
-
-        # Test parameters
-        test_params = {
-            'mass': 1.0,
-            'gravity': 9.81,
-            'horizontal_drag': 0.1,
-            'vertical_drag': 0.1,
-            'parasitic_drag': 0.01,
-            'speed_smooth': 1e-3
-        }
-
-        original_mapper.reset(**test_params)
-        casadi_mapper.reset(**test_params)
-
-        # Test case: Complex motion
-        vel = np.array([0.5, 0.3, 0.1])
-        acc = np.array([0.2, 0.1, 0.05])
-        jer = np.array([0.01, 0.005, 0.002])
-        psi = 0.5
-        dpsi = 0.1
-
-        # Forward comparison
-        thrust_orig, quat_orig, omg_orig = original_mapper.forward(vel, acc, jer, psi, dpsi)
-        thrust_casadi, quat_casadi, omg_casadi = casadi_mapper.forward(vel, acc, jer, psi, dpsi)
-
-        print("Forward comparison:")
-        print(f"Original thrust: {thrust_orig:.6f}")
-        print(f"CasADi thrust: {thrust_casadi:.6f}")
-        print(f"Thrust difference: {abs(thrust_orig - thrust_casadi):.6e}")
-
-        print(f"\nOriginal quat: {quat_orig}")
-        print(f"CasADi quat: {quat_casadi}")
-        print(f"Quat max difference: {np.max(np.abs(quat_orig - quat_casadi)):.6e}")
-
-        print(f"\nOriginal omg: {omg_orig}")
-        print(f"CasADi omg: {omg_casadi}")
-        print(f"Omg max difference: {np.max(np.abs(omg_orig - omg_casadi)):.6e}")
-
-        # Backward comparison
-        pos_grad = np.array([0.1, 0.2, 0.3])
-        vel_grad = np.array([0.05, 0.1, 0.15])
-        thr_grad = 0.5
-        quat_grad = np.array([0.01, 0.02, 0.03, 0.04])
-        omg_grad = np.array([0.1, 0.2, 0.3])
-
-        # Original backward
-        orig_outputs = original_mapper.backward(
-            pos_grad, vel_grad, thr_grad, quat_grad, omg_grad
+        return (
+            pos_total_grad,
+            vel_total_grad,
+            acc_total_grad,
+            jer_total_grad,
+            psi_total_grad,
+            dpsi_total_grad,
         )
 
-        # CasADi backward
-        casadi_outputs = casadi_mapper.backward(
-            pos_grad, vel_grad, thr_grad, quat_grad, omg_grad,
+
+def test_casadi_flatness_forward(tmp_path: Path | None = None) -> None:
+    """Verify CasADi flatness forward outputs match the C++ bindings."""
+
+    if tmp_path is None:
+        tmp_path = Path("/tmp")
+    test_params: Dict[str, float] = {
+        "mass": 1.0,
+        "gravity": 9.81,
+        "horizontal_drag": 0.1,
+        "vertical_drag": 0.1,
+        "parasitic_drag": 0.01,
+        "speed_smooth": 1.0e-3,
+    }
+
+    casadi_mapper, reference_mapper = _create_mappers(tmp_path, test_params)
+
+    cases = [
+        (
+            np.zeros(3, dtype=float),
+            np.zeros(3, dtype=float),
+            np.zeros(3, dtype=float),
+            0.0,
+            0.0,
+        ),
+        (
+            np.array([1.0, 0.0, 0.0], dtype=float),
+            np.array([0.1, 0.0, 0.0], dtype=float),
+            np.array([0.01, 0.0, 0.0], dtype=float),
+            0.0,
+            0.0,
+        ),
+        (
+            np.array([0.5, 0.3, 0.1], dtype=float),
+            np.array([0.2, 0.1, 0.05], dtype=float),
+            np.array([0.01, 0.005, 0.002], dtype=float),
+            0.5,
+            0.1,
+        ),
+    ]
+
+    for vel, acc, jer, psi, dpsi in cases:
+        thrust_casadi, quat_casadi, omg_casadi = casadi_mapper.forward(
+            vel, acc, jer, psi, dpsi
+        )
+        thrust_ref, quat_ref, omg_ref = reference_mapper.forward(
             vel, acc, jer, psi, dpsi
         )
 
-        print("\nBackward comparison:")
-        print(f"Original pos_total_grad: {orig_outputs[0]}")
-        print(f"CasADi pos_total_grad: {casadi_outputs[0]}")
-        print(f"Pos grad max difference: {np.max(np.abs(orig_outputs[0] - casadi_outputs[0])):.6e}")
+        assert thrust_casadi == pytest.approx(thrust_ref, abs=1e-6)
+        np.testing.assert_allclose(quat_casadi, quat_ref, atol=1e-6)
+        np.testing.assert_allclose(omg_casadi, omg_ref, atol=1e-6)
 
-        print(f"\nOriginal vel_total_grad: {orig_outputs[1]}")
-        print(f"CasADi vel_total_grad: {casadi_outputs[1]}")
-        print(f"Vel grad max difference: {np.max(np.abs(orig_outputs[1] - casadi_outputs[1])):.6e}")
 
-        print(f"\nOriginal acc_total_grad: {orig_outputs[2]}")
-        print(f"CasADi acc_total_grad: {casadi_outputs[2]}")
-        print(f"Acc grad max difference: {np.max(np.abs(orig_outputs[2] - casadi_outputs[2])):.6e}")
+def test_casadi_flatness_backward() -> None:
+    """Verify CasADi backward gradients remain numerically stable."""
+    test_params: Dict[str, float] = {
+        "mass": 1.0,
+        "gravity": 9.81,
+        "horizontal_drag": 0.1,
+        "vertical_drag": 0.1,
+        "parasitic_drag": 0.01,
+        "speed_smooth": 1.0e-3,
+    }
 
-        print(f"\nOriginal jer_total_grad: {orig_outputs[3]}")
-        print(f"CasADi jer_total_grad: {casadi_outputs[3]}")
-        print(f"Jer grad max difference: {np.max(np.abs(orig_outputs[3] - casadi_outputs[3])):.6e}")
+    casadi_mapper = CasadiFlatnessMap()
+    casadi_mapper.reset(**test_params)
 
-        print(f"\nOriginal psi_total_grad: {orig_outputs[4]}")
-        print(f"CasADi psi_total_grad: {casadi_outputs[4]}")
-        print(f"Psi grad difference: {abs(orig_outputs[4] - casadi_outputs[4]):.6e}")
+    vel = np.array([0.5, 0.3, 0.1], dtype=float)
+    acc = np.array([0.2, 0.1, 0.05], dtype=float)
+    jer = np.array([0.01, 0.005, 0.002], dtype=float)
+    psi = 0.5
+    dpsi = 0.1
 
-        print(f"\nOriginal dpsi_total_grad: {orig_outputs[5]}")
-        print(f"CasADi dpsi_total_grad: {casadi_outputs[5]}")
-        print(f"Dpsi grad difference: {abs(orig_outputs[5] - casadi_outputs[5]):.6e}")
+    pos_grad = np.array([0.1, 0.2, 0.3], dtype=float)
+    vel_grad = np.array([0.05, 0.1, 0.15], dtype=float)
+    thr_grad = 0.5
+    quat_grad = np.array([0.01, 0.02, 0.03, 0.04], dtype=float)
+    omg_grad = np.array([0.1, 0.2, 0.3], dtype=float)
 
-    except ImportError:
-        print("Original minco module not available, skipping comparison")
+    casadi_outputs = casadi_mapper.backward(
+        pos_grad,
+        vel_grad,
+        thr_grad,
+        quat_grad,
+        omg_grad,
+        vel,
+        acc,
+        jer,
+        psi,
+        dpsi,
+    )
+
+    expected_pos = np.array([0.1, 0.2, 0.3], dtype=float)
+    expected_vel = np.array([0.05150152, 0.10063794, 0.20027595], dtype=float)
+    expected_acc = np.array([0.01664616, 0.00607351, 0.49963408], dtype=float)
+    expected_jer = np.array([0.02282376, 0.00043404, -0.00058452], dtype=float)
+    expected_psi = 0.018642654194889696
+    expected_dpsi = 0.3
+
+    np.testing.assert_allclose(casadi_outputs[0], expected_pos, rtol=1e-6, atol=1e-8)
+    np.testing.assert_allclose(casadi_outputs[1], expected_vel, rtol=1e-6, atol=1e-8)
+    np.testing.assert_allclose(casadi_outputs[2], expected_acc, rtol=1e-6, atol=1e-8)
+    np.testing.assert_allclose(casadi_outputs[3], expected_jer, rtol=1e-6, atol=1e-8)
+    assert casadi_outputs[4] == pytest.approx(expected_psi, rel=1e-6, abs=1e-8)
+    assert casadi_outputs[5] == pytest.approx(expected_dpsi, rel=1e-6, abs=1e-8)
 
 
 if __name__ == "__main__":
@@ -463,5 +487,3 @@ if __name__ == "__main__":
 
     test_casadi_flatness_backward()
     print("\n" + "=" * 50)
-
-    compare_with_original()
