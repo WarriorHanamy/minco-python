@@ -158,7 +158,7 @@ runs/
 
 
 # tests/
-tests/
+# Allow repository tests to be committed.
 utils/
 
 trys/
@@ -176,3 +176,6 @@ trys/
 *.mov
 *.mkv
 *.wmv
+
+
+*.pyi

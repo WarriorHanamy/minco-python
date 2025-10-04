@@ -11,10 +11,16 @@ PROJETCT_INCLUDE_DIR = "src/minco_trajectory/include"
 ext_modules = [
     Extension(
         "trajectory",
-        ["src/minco_trajectory/src/traj_bindings.cpp"],
+        [
+            "src/minco_trajectory/src/traj_bindings.cpp",
+            "src/minco_trajectory/src/bindings/polynomial_bindings.cpp",
+            "src/minco_trajectory/src/bindings/sdlp_bindings.cpp",
+            "src/minco_trajectory/src/bindings/root_finder_bindings.cpp",
+            "src/minco_trajectory/src/bindings/geo_utils_bindings.cpp",
+            "src/minco_trajectory/src/bindings/flatness_bindings.cpp",
+        ],
         include_dirs=[pybind11.get_include(), PROJETCT_INCLUDE_DIR, EIGEN_INCLUDE_DIR],
         language="c++",
-        cxx_std=17,
         extra_compile_args=["-std=c++17"],
     ),
 ]

@@ -53,4 +53,4 @@ filterwarnings = [
 python_classes = "Test*"
 python_files = "test_*.py"
 python_functions = "test_*"
-testpaths = ["minco-python/tests"]
+testpaths = ["tests"]
