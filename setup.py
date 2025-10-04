@@ -10,9 +10,9 @@ PROJETCT_INCLUDE_DIR = "src/minco_trajectory/include"
 
 ext_modules = [
     Extension(
-        "trajectory",
+        "minco",
         [
-            "src/minco_trajectory/src/traj_bindings.cpp",
+            "src/minco_trajectory/src/minco_module.cpp",
             "src/minco_trajectory/src/bindings/polynomial_bindings.cpp",
             "src/minco_trajectory/src/bindings/sdlp_bindings.cpp",
             "src/minco_trajectory/src/bindings/root_finder_bindings.cpp",
@@ -21,7 +21,7 @@ ext_modules = [
         ],
         include_dirs=[pybind11.get_include(), PROJETCT_INCLUDE_DIR, EIGEN_INCLUDE_DIR],
         language="c++",
-        extra_compile_args=["-std=c++17"],
+        extra_compile_args=["-std=c++17", "-O2"],
     ),
 ]
 
@@ -40,14 +40,14 @@ class BuildWithStubs(build_ext):
                     sys.executable,
                     "-m",
                     "pybind11_stubgen",
-                    "--module-name=trajectory",
+                    "--module-name=minco",
                     "--output-dir=./stubs",
                     "--ignore-invalid=all",
                 ],
                 check=True,
             )
 
-            os.system("cp ./stubs/trajectory.pyi ./")
+            os.system("cp ./stubs/minco.pyi ./")
         except Exception as e:
             print(f"Warning: Failed to generate stubs - {e}")
 
@@ -57,8 +57,8 @@ setup(
     version="0.1.0",
     ext_modules=ext_modules,
     cmdclass={"build_ext": BuildWithStubs},
-    packages=["trajectory-stubs"],
-    package_data={"trajectory-stubs": ["*.pyi"]},
+    packages=[],
+    package_data={},
     install_requires=["pybind11>=2.10.0", "pybind11-stubgen>=0.12"],
     python_requires=">=3.7",
 )

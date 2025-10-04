@@ -6,8 +6,8 @@ import minco
 
 @pytest.mark.parametrize("degree", [5, 7])
 def test_piece_and_trajectory_roundtrip(degree):
-    piece_cls = getattr(minco.trajectory, f"Piece{degree}")
-    traj_cls = getattr(minco.trajectory, f"Trajectory{degree}")
+    piece_cls = getattr(minco.poly_traj, f"Piece{degree}")
+    traj_cls = getattr(minco.poly_traj, f"Trajectory{degree}")
 
     coeff_mat = np.ones((3, degree + 1))
     piece = piece_cls(2.0, coeff_mat)
@@ -34,8 +34,8 @@ def test_piece_and_trajectory_roundtrip(degree):
 
 @pytest.mark.parametrize("degree", [5, 7])
 def test_append_piece_updates_duration(degree):
-    piece_cls = getattr(minco.trajectory, f"Piece{degree}")
-    traj_cls = getattr(minco.trajectory, f"Trajectory{degree}")
+    piece_cls = getattr(minco.poly_traj, f"Piece{degree}")
+    traj_cls = getattr(minco.poly_traj, f"Trajectory{degree}")
 
     base_piece = piece_cls(1.0, np.eye(3, degree + 1))
     traj = traj_cls([base_piece.duration], [base_piece.get_coeff_mat()])

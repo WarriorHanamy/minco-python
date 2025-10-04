@@ -19,8 +19,6 @@ def test_flatness_forward_backward_zero_motion():
     jer = np.zeros(3)
 
     thrust, quat, omg = mapper.forward(vel, acc, jer, psi=0.0, dpsi=0.0)
-    print(thrust, quat, omg)
-    exit()
     np.testing.assert_allclose(thrust, 9.81, atol=1e-6)
     np.testing.assert_allclose(quat, np.array([1.0, 0.0, 0.0, 0.0]), atol=1e-6)
     np.testing.assert_allclose(omg, np.zeros(3), atol=1e-6)
