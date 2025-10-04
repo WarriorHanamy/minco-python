@@ -10,7 +10,7 @@
 
 ## 2. Everyday Commands
 - `uv sync` — install dependencies into the uv-managed virtual environment.
-- `uv pip install -e . --no-deps` — rebuild the pybind11 extension after C++ changes.
+- tools/[command] should be registered into justfile.
 - `uv run pytest` — execute the full Python test suite (`-k` to scope).
 - `uv run ruff check .` and `uv run ruff format .` — lint and format Python code.
 
@@ -35,6 +35,7 @@
 
 ## 6. Agent-Specific Practices
 - Regenerate Python stubs after signature changes with `uv run pybind11-stubgen minco && mv stubs/minco.pyi .`.
+- Executable helpers in `tools/` must remain extensionless and be invoked through `uv run tools/<name>` to keep the uv environment active (e.g. `uv run tools/rebuild_extension`).
 - When tweaking GCOPTER penalties, update the matching C++ integration and the smoke tests in `tests/test_gcopter_bindings.py`.
 - Prefer adding new configuration through YAML files in `config/` rather than hardcoding constants.
 
