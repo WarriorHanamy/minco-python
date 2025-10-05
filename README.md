@@ -11,24 +11,17 @@
 2. flatness前向方向部分基于casadi来进行代码生成，集成。
 3. 暴露python接口，用户不应体验cpp的细节。
 
-## WARNING
-make sure you are familiar with ros2 rules.
 
+## 参数
+参数一般在config/下面设置
 
-## pybind11接口设计
-1. setup_intial_trajectory
-    Args:
-        1. headPVAJ, tailPVAJ, initTimeAllooc, init
-    Params:
-        1. lbfgs setting
+还有些优化参数的接口设计的不合理，参数test_gcopter*.py的case
 
 
 
 ## Config设计
 1. costfunc_config
 2. lbgfs_config
-3. sfc_config
-
 
 
 
@@ -51,3 +44,12 @@ uv run pybind11-stubgen minco
 
 （似乎最新配置的uv sync直接一步到位了？？？）
 （TODO：应该移动到 site-packages下面）
+
+
+
+## Roadmap
+-[] lbfgs -> sqcqp
+-[] 接口更加自然
+-[] 增加固定翼/VTOL微分平坦 轨迹生成。
+
+
