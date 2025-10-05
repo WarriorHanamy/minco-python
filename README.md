@@ -1,3 +1,7 @@
+# Features
+1. 支持只需用casadi写前向的flatness符号函数，casadi自动生成梯度函数，集成进MINCO优化框架
+2. python-first，配合numpy等方便生成各种形状轨迹，及其可视化
+
 # Goal
 ![MINCO轨迹](./thumbnail.png)
 
