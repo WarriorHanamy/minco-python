@@ -11,6 +11,61 @@ import numpy as np
 import pytest
 
 
+def generate_trajectory(shape_type="circle", radius=30.0, height=1.5, piece_count=20):
+    pos0 = np.array([radius, 0.0, height])
+    vel0 = np.zeros(3)
+    acc0 = np.zeros(3)
+    head_pva = np.column_stack([pos0, vel0, acc0])
+    tail_pva = np.column_stack([pos0 + np.array([1, 0, 0]), vel0, acc0])
+
+    if shape_type == "circle":
+        angles = np.linspace(0.0, 2.0 * np.pi, piece_count + 1)
+        inner_points = np.vstack(
+            [
+                radius * np.cos(angles[1:-1]),
+                radius * np.sin(angles[1:-1]),
+                np.full(piece_count - 1, height),
+            ]
+        )
+    elif shape_type == "figure8":
+        t = np.linspace(0, 2 * np.pi, piece_count + 1)[1:-1]
+        scale = radius / 2
+        inner_points = np.vstack(
+            [
+                scale * np.sqrt(2) * np.cos(t) / (np.sin(t) ** 2 + 1),
+                scale * np.sqrt(2) * np.cos(t) * np.sin(t) / (np.sin(t) ** 2 + 1),
+                np.full(piece_count - 1, height),
+            ]
+        )
+    elif shape_type == "square":
+        points_per_side = piece_count // 4
+        side_length = radius
+        x = np.linspace(-side_length, side_length, points_per_side + 1)[:-1]
+        y = np.linspace(-side_length, side_length, points_per_side + 1)[:-1]
+
+        top = np.vstack([x, np.full_like(x, side_length), np.full_like(x, height)])
+        right = np.vstack(
+            [np.full_like(y, side_length), y[::-1], np.full_like(y, height)]
+        )
+        bottom = np.vstack(
+            [x[::-1], np.full_like(x, -side_length), np.full_like(x, height)]
+        )
+        left = np.vstack([np.full_like(y, -side_length), y, np.full_like(y, height)])
+
+        inner_points = np.hstack([top, right, bottom, left])[:, : piece_count - 1]
+    else:
+        raise ValueError(f"Unknown shape type: {shape_type}")
+
+    print(f"Generated {shape_type} trajectory points:")
+    print(inner_points)
+
+    omega = 0.5
+    horizon = 2.0 * np.pi / omega
+    initial_time = np.full(piece_count, horizon / piece_count)
+
+    return head_pva, tail_pva, inner_points, initial_time
+
+
 def visualize_gcopter_trajectory(
     trajectory: Any, time_samples: Optional[np.ndarray] = None
 ) -> None:
@@ -49,35 +104,17 @@ def visualize_gcopter_trajectory(
 def _run_casadi_gcopter_circle() -> Dict[str, Any]:
     optimizer = minco.gcopter.GCOPTERPolytopeSFCCasadi()
     optimizer.configure_from_file("config/default_gcopter.yaml")
+    config = {
+        "shape_type": "square",  # 可选: "circle", "figure8", "square"
+        "radius": 30.0,
+        "height": 1.5,
+        "piece_count": 20,
+    }
 
-    radius = 30.0
-    height = 1.5
-    piece_count = 20
-
-    pos0 = np.array([radius, 0.0, height])
-    vel0 = np.zeros(3)
-    acc0 = np.zeros(3)
-
-    head_pva = np.column_stack([pos0, vel0, acc0])
-    tail_pva = head_pva.copy()
-
-    angles = np.linspace(0.0, 2.0 * np.pi, piece_count + 1)
-    inner_points = np.vstack(
-        [
-            radius * np.cos(angles[1:-1]),
-            radius * np.sin(angles[1:-1]),
-            np.full(piece_count - 1, height),
-        ]
-    )
-
-    print(inner_points)
-
-    omega = 0.5
-    horizon = 2.0 * np.pi / omega
-    initial_time = np.full(piece_count, horizon / piece_count)
+    head_pva, tail_pva, inner_points, initial_time = generate_trajectory(**config)
 
     corridor_half = 1.0
-    z_max = height + 0.5
+    z_max = config["height"] + 0.5
     box_planes = np.array(
         [
             [1.0, 0.0, 0.0, -corridor_half],
@@ -118,8 +155,6 @@ def _run_casadi_gcopter_circle() -> Dict[str, Any]:
         "trajectory": trajectory,
         "time_samples": samples,
         "positions": positions,
-        "piece_count": piece_count,
-        "start": pos0,
     }
 
 

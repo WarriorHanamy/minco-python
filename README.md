@@ -1,4 +1,6 @@
 # Goal
+![MINCO轨迹](./thumbnail.png)
+
 这个项目来完成python-first的多旋翼/固定翼轨迹生成，基于[MINCO](https://github.com/ZJU-FAST-Lab/GCOPTER.git)。
 
 原始的MINCO包含：
