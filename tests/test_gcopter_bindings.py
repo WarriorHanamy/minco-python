@@ -126,7 +126,13 @@ def _run_gcopter_circle_warm_start() -> Dict[str, Any]:
             [0.0, 0.0, -1.0, 0.0],
         ]
     )
-    corridors = [box_planes.copy() for _ in range(piece_count - 1)]
+
+    def _center_box_planes(center: np.ndarray) -> np.ndarray:
+        translated = box_planes.copy()
+        translated[:, 3] -= box_planes[:, :3] @ center
+        return translated
+
+    corridors = [_center_box_planes(point) for point in inner_points.T]
 
     assert optimizer.setup_basic_trajectory(
         head_pva,

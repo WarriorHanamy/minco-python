@@ -25,7 +25,7 @@ def visualize_gcopter_trajectory(
     fig = plt.figure(figsize=(12, 5))
 
     ax_3d = fig.add_subplot(121, projection="3d")
-    ax_3d.view_init(elev=75, azim=45)
+    ax_3d.view_init(elev=90, azim=45)
     ax_3d.plot(positions[:, 0], positions[:, 1], positions[:, 2], "b-", linewidth=2)
     ax_3d.scatter(positions[0, 0], positions[0, 1], positions[0, 2], c="green", s=60)
     ax_3d.scatter(positions[-1, 0], positions[-1, 1], positions[-1, 2], c="red", s=60)
@@ -88,7 +88,13 @@ def _run_casadi_gcopter_circle() -> Dict[str, Any]:
             [0.0, 0.0, -1.0, 0.0],
         ]
     )
-    corridors = [box_planes.copy() for _ in range(piece_count - 1)]
+
+    def _center_box_planes(center: np.ndarray) -> np.ndarray:
+        translated = box_planes.copy()
+        translated[:, 3] -= box_planes[:, :3] @ center
+        return translated
+
+    corridors = [_center_box_planes(point) for point in inner_points.T]
 
     assert optimizer.setup_basic_trajectory(
         head_pva,
