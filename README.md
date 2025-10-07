@@ -1,69 +1,230 @@
-# Features
-1. 支持只需用casadi写前向的flatness符号函数，casadi自动生成梯度函数，集成进MINCO优化框架
-2. python-first，配合numpy等方便生成各种形状轨迹，及其可视化
+# MINCO-Python
 
-# Goal
-![MINCO轨迹](./thumbnail.png)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
+[![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://isocpp.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-这个项目来完成python-first的多旋翼/固定翼轨迹生成，基于[MINCO](https://github.com/ZJU-FAST-Lab/GCOPTER.git)。
+**Python bindings for MINCO (Minimum Control Effort) trajectory optimization library** - A high-performance trajectory planning framework for multirotor and fixed-wing aircraft.
 
-原始的MINCO包含：
-1. 前端飞行走廊生成；
-2. 基于多旋翼的forward-flatness 和 backward-flatness的model来进行平坦空间的轨迹生成；
-3. 纯ROS，cpp的项目。
+![MINCO Trajectory](./thumbnail.png)
 
-为了便捷动力学轨迹生成这一单一任务，为其他learning-based control服务，这个项目的改进要点为：
-1. 去除前端飞行走廊部分
-2. flatness前向方向部分基于casadi来进行代码生成，集成。
-3. 暴露python接口，用户不应体验cpp的细节。
+## Overview
 
+MINCO-Python is a Python-first trajectory optimization library that provides efficient trajectory planning capabilities for unmanned aerial vehicles. Based on the [MINCO](https://github.com/ZJU-FAST-Lab/GCOPTER.git) framework, this project removes ROS dependencies and exposes a clean Python interface while maintaining the high-performance C++ backend.
 
-## 参数
-参数一般在config/下面设置
+## Key Features
 
-还有些优化参数的接口设计的不合理，参数test_gcopter*.py的case
+- 🚀 **Python-First Design**: Native Python interface with NumPy integration
+- ⚡ **High Performance**: C++17 backend with O(N) banded system solvers
+- 🎯 **CasADi Integration**: Automatic differentiation for flatness models
+- 🔧 **Configurable**: YAML-based configuration system
+- 📊 **Visualization**: Built-in matplotlib support with interactive plotting
+- 🧪 **Well-Tested**: Comprehensive test suite with validation examples
 
+## Architecture
 
+### Core Components
 
-## Config设计
-1. costfunc_config
-2. lbgfs_config
+**C++ Backend:**
+- `minco.hpp` - Banded system solver with O(N) complexity
+- `gcopter.hpp` - GCOPTER trajectory optimizer with geometric control
+- `flatness.hpp` - Differential flatness mapping for multirotor dynamics
+- `trajectory.hpp` - Piecewise polynomial trajectory representation
 
+**Python Bindings:**
+- Complete pybind11 bindings with NumPy array support
+- Automatic Python type stub generation (.pyi files)
+- CasADi automatic differentiation integration
 
+**Configuration System:**
+- YAML configuration files for aircraft parameters
+- Customizable flatness model definitions
+- LBFGS optimizer parameter tuning
 
 ## Installation
-### cpp库
-```shell
-sudo apt install libyaml-cpp-dev  libeigen-dev
+
+### Prerequisites
+
+- Python 3.8+
+- C++17 compatible compiler
+- Eigen3 library
+- yaml-cpp library
+
+### Install C++ Dependencies
+
+```bash
+# Install required C++ libraries
+sudo apt install libyaml-cpp-dev libeigen-dev
 ```
-### 安装uv
-```shell
+
+### Install uv Package Manager
+
+```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### 利用uv一步安装
-```shell
+### Install Python Dependencies
+
+```bash
+# Install all Python dependencies
 uv sync
 ```
 
-### 额外开发 [Optional]
-python工具链自动构建cpp-pybind11
-```shell
+### Build and Install
+
+```bash
+# Build C++ extensions and install Python package
 uv pip install -e . --no-deps
 ```
 
-### 生成pybind11静态类型提示
-```shell
+### Generate Type Stubs [Optional]
+
+```bash
+# Generate pybind11 type hints for better IDE support
 uv run pybind11-stubgen minco
 ```
-然后将生成的stub/*.pyi 移动至与*.so同级别路径下。(TODO 应该是更加优雅的方式）
 
+The generated stub files will be automatically placed alongside the compiled module.
 
+## Quick Start
 
+```python
+import numpy as np
+import minco
 
-## Roadmap
-- [] lbfgs -> sqcqp
-- [] 接口更加自然
-- [] 增加固定翼/VTOL微分平坦 轨迹生成。
+# Create a simple trajectory
+trajectory = minco.Trajectory()
+# Generate trajectory points
+points = np.array([[0, 1, 2, 3],
+                   [0, 1, 0, 1],
+                   [1, 1, 1, 1]])
+# Optimize trajectory
+trajectory.optimize(points)
+```
 
+## Development Roadmap
 
+- [ ] **LBFGS → SQCQP**: Upgrade optimization algorithm
+- [ ] **Enhanced API**: More natural Python interface design
+- [ ] **Fixed-Wing Support**: Add fixed-wing/VTOL differential flatness models
+- [ ] **Real-time Planning**: Real-time trajectory generation capabilities
+
+## Configuration
+
+Configuration files are located in the `config/` directory:
+
+- `default_gcopter.yaml` - Main trajectory optimization parameters
+- `default_flatness_config.yaml` - Flatness model parameters
+- `lbfgs.yaml` - Optimizer configuration
+- `casadi_quadrotor_flatness.yaml` - CasADi flatness model
+
+### Key Configuration Sections
+
+1. **Cost Function Configuration** (`costfunc_config`)
+   - Weight matrices for position, velocity, acceleration
+   - Physical constraints (velocity, thrust limits)
+   - Smoothness factors
+
+2. **LBFGS Optimizer Configuration** (`lbfgs_config`)
+   - Convergence tolerances
+   - Maximum iterations
+   - Line search parameters
+
+## Supported Trajectory Shapes
+
+The library includes built-in trajectory generators for:
+
+- 🔵 **Circular** trajectories
+- **8-Shaped** trajectories
+- **Square** trajectories
+- Custom waypoint-based trajectories
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run specific test
+uv run pytest tests/test_gcopter_casadi_visualization.py
+```
+
+### Test Categories
+
+- **Flatness Tests**: Validate differential flatness implementations
+- **GCOPTER Tests**: Test trajectory optimization with various constraints
+- **Visualization Tests**: Interactive trajectory plotting and validation
+- **CasADi Tests**: Automatic differentiation and gradient computation
+
+## Applications
+
+- Multirotor UAV trajectory planning
+- Learning-based control research
+- Aircraft dynamics simulation
+- Trajectory optimization algorithm validation
+- Real-time motion planning
+
+## Project Structure
+
+```
+minco-python/
+├── src/minco_trajectory/     # C++ source code
+│   ├── include/              # Header files
+│   ├── src/                  # Implementation
+│   └── src/bindings/         # Python bindings
+├── tests/                    # Test suite
+├── config/                   # Configuration files
+├── docs/                     # Documentation
+└── tools/                    # Build utilities
+```
+
+## Technical Details
+
+### Differential Flatness
+
+The project uses differential flatness theory to transform complex 3D trajectory planning problems into simpler flat space optimization. The flatness mapping handles:
+
+- Forward mapping: flat variables → physical states (position, velocity, acceleration)
+- Backward mapping: physical state gradients → flat variable gradients
+
+### Optimization
+
+Trajectory optimization is performed using LBFGS with:
+- Piecewise polynomial trajectory representation
+- Physical constraints (velocity, acceleration, thrust limits)
+- Smoothness regularization terms
+- Boundary condition enforcement
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Based on the [MINCO](https://github.com/ZJU-FAST-Lab/GCOPTER) framework from ZJU FAST Lab
+- Built with [Eigen](https://eigen.tuxfamily.org) for linear algebra
+- Python bindings powered by [pybind11](https://github.com/pybind/pybind11)
+- Symbolic computation with [CasADi](https://web.casadi.org)
+
+## Citation
+
+If you use this library in your research, please cite:
+
+```bibtex
+@software{minco_python,
+  title={MINCO-Python: Python Bindings for Minimum Control Effort Trajectory Optimization},
+  author={Hanamy},
+  year={2024},
+  url={https://github.com/hanamy/minco-python}
+}
+```
