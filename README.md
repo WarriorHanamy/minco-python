@@ -32,30 +32,38 @@
 
 
 ## Installation
-首先同步python依赖
+### cpp库
+```shell
+sudo apt install libyaml-cpp-dev  libeigen-dev
+```
+### 安装uv
+```shell
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### 利用uv一步安装
 ```shell
 uv sync
 ```
 
+### 额外开发 [Optional]
 python工具链自动构建cpp-pybind11
 ```shell
 uv pip install -e . --no-deps
 ```
 
-生成pybind11静态类型提示
+### 生成pybind11静态类型提示
 ```shell
 uv run pybind11-stubgen minco
 ```
-然后将生成的stub/*.pyi 移动至与*.so同级别路径下。
+然后将生成的stub/*.pyi 移动至与*.so同级别路径下。(TODO 应该是更加优雅的方式）
 
-（似乎最新配置的uv sync直接一步到位了？？？）
-（TODO：应该移动到 site-packages下面）
 
 
 
 ## Roadmap
--[] lbfgs -> sqcqp
--[] 接口更加自然
--[] 增加固定翼/VTOL微分平坦 轨迹生成。
+- [] lbfgs -> sqcqp
+- [] 接口更加自然
+- [] 增加固定翼/VTOL微分平坦 轨迹生成。
 
 
