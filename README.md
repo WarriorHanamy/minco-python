@@ -1,7 +1,7 @@
 # MINCO-Python
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-[![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://isocpp.org)
+[![C++](https://img.shields.io/badge/C++-20-blue.svg)](https://isocpp.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **Python bindings for MINCO (Minimum Control Effort) trajectory optimization library** - A high-performance trajectory planning framework for multirotor and fixed-wing aircraft.
@@ -15,7 +15,7 @@ MINCO-Python is a Python-first trajectory optimization library that provides eff
 ## Key Features
 
 - 🚀 **Python-First Design**: Native Python interface with NumPy integration
-- ⚡ **High Performance**: C++17 backend with O(N) banded system solvers
+- ⚡ **High Performance**: C++20 backend with O(N) banded system solvers
 - 🎯 **CasADi Integration**: Automatic differentiation for flatness models
 - 🔧 **Configurable**: YAML-based configuration system
 - 📊 **Visualization**: Built-in matplotlib support with interactive plotting
@@ -223,8 +223,8 @@ If you use this library in your research, please cite:
 ```bibtex
 @software{minco_python,
   title={MINCO-Python: Python Bindings for Minimum Control Effort Trajectory Optimization},
-  author={Hanamy},
-  year={2024},
+  author={Erchao Rong},
+  year={2025},
   url={https://github.com/hanamy/minco-python}
 }
 ```
