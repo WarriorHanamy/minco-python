@@ -1,6 +1,6 @@
 # MINCO-Python
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://python.org)
 [![C++](https://img.shields.io/badge/C++-20-blue.svg)](https://isocpp.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -45,8 +45,8 @@ MINCO-Python is a Python-first trajectory optimization library that provides eff
 
 ### Prerequisites
 
-- Python 3.8+
-- C++17 compatible compiler
+- Python 3.13+
+- C++20 compatible compiler
 - Eigen3 library
 - yaml-cpp library
 
@@ -69,13 +69,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Install all Python dependencies
 uv sync
 ```
-
-### Build and Install
-
+It would automatically building the cpp project.
+<!-- 
 ```bash
 # Build C++ extensions and install Python package
 uv pip install -e . --no-deps
-```
+``` -->
 
 ### Generate Type Stubs [Optional]
 
@@ -101,6 +100,27 @@ points = np.array([[0, 1, 2, 3],
 # Optimize trajectory
 trajectory.optimize(points)
 ```
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run specific test
+uv run pytest tests/test_gcopter_casadi_visualization.py
+```
+
+### Test Categories
+
+- **Flatness Tests**: Validate differential flatness implementations
+- **GCOPTER Tests**: Test trajectory optimization with various constraints
+- **Visualization Tests**: Interactive trajectory plotting and validation
+- **CasADi Tests**: Automatic differentiation and gradient computation
+
+
 
 ## Development Roadmap
 
@@ -139,24 +159,6 @@ The library includes built-in trajectory generators for:
 - **Square** trajectories
 - Custom waypoint-based trajectories
 
-## Testing
-
-Run the test suite:
-
-```bash
-# Run all tests
-uv run pytest
-
-# Run specific test
-uv run pytest tests/test_gcopter_casadi_visualization.py
-```
-
-### Test Categories
-
-- **Flatness Tests**: Validate differential flatness implementations
-- **GCOPTER Tests**: Test trajectory optimization with various constraints
-- **Visualization Tests**: Interactive trajectory plotting and validation
-- **CasADi Tests**: Automatic differentiation and gradient computation
 
 ## Applications
 
@@ -225,6 +227,6 @@ If you use this library in your research, please cite:
   title={MINCO-Python: Python Bindings for Minimum Control Effort Trajectory Optimization},
   author={Erchao Rong},
   year={2025},
-  url={https://github.com/hanamy/minco-python}
+  url={https://github.com/WarriorHanamy/minco-python}
 }
 ```
