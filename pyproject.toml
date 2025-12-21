@@ -16,7 +16,6 @@ dependencies = [
   "seaborn",
   "sympy",
   "control",
-  "gymnasium",
   "ipykernel",
   "notebook",
   "jupyter",
@@ -24,7 +23,6 @@ dependencies = [
   "jupyter_core",
   "traitlets",
   "ipywidgets>=8,<9",
-  "stable-baselines3[extra]",
   "pybind11-stubgen",
 ]
 description = "Reinforcement Learning for Tailsitter UAVs"
@@ -49,7 +47,6 @@ dev-dependencies = [
 [tool.pytest.ini_options]
 filterwarnings = [
   "ignore:The use of `x.T` on tensors of dimension other than 2:UserWarning",
-  "ignore:You are trying to run PPO on the GPU:UserWarning",
 ]
 python_classes = "Test*"
 python_files = "test_*.py"

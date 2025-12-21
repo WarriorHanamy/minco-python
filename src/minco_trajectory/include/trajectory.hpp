@@ -438,6 +438,12 @@ public:
     inline int locatePieceIdx(double &t) const
     {
         int N = getPieceNum();
+        if (N == 0)
+        {
+            // Return 0 for empty trajectories to avoid segmentation fault
+            // The trajectory methods should handle this case gracefully
+            return 0;
+        }
         int idx;
         double dur;
         for (idx = 0;
@@ -457,24 +463,40 @@ public:
 
     inline Eigen::Vector3d getPos(double t) const
     {
+        if (getPieceNum() == 0)
+        {
+            return Eigen::Vector3d::Zero();
+        }
         int pieceIdx = locatePieceIdx(t);
         return pieces[pieceIdx].getPos(t);
     }
 
     inline Eigen::Vector3d getVel(double t) const
     {
+        if (getPieceNum() == 0)
+        {
+            return Eigen::Vector3d::Zero();
+        }
         int pieceIdx = locatePieceIdx(t);
         return pieces[pieceIdx].getVel(t);
     }
 
     inline Eigen::Vector3d getAcc(double t) const
     {
+        if (getPieceNum() == 0)
+        {
+            return Eigen::Vector3d::Zero();
+        }
         int pieceIdx = locatePieceIdx(t);
         return pieces[pieceIdx].getAcc(t);
     }
 
     inline Eigen::Vector3d getJer(double t) const
     {
+        if (getPieceNum() == 0)
+        {
+            return Eigen::Vector3d::Zero();
+        }
         int pieceIdx = locatePieceIdx(t);
         return pieces[pieceIdx].getJer(t);
     }
