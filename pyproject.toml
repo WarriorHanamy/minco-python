@@ -7,29 +7,15 @@ authors = [
   {name = "Hanamy", email = "rongerch@outlook.com"},
 ]
 dependencies = [
-  "numpy",
+  "numpy>=2.3,<2.4",
   "matplotlib",
-  "pandas",
-  "scipy",
   "casadi",
-  "scikit-learn",
-  "seaborn",
-  "sympy",
-  "control",
-  "ipykernel",
-  "notebook",
-  "jupyter",
-  "jupyter_client",
-  "jupyter_core",
-  "traitlets",
-  "ipywidgets>=8,<9",
-  "pybind11-stubgen",
 ]
 description = "Reinforcement Learning for Tailsitter UAVs"
 license = {text = "MIT"}
 name = "minco-python"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 version = "0.1.0"
 
 [tool.setuptools.packages.find]
