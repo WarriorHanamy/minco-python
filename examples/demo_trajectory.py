@@ -1,13 +1,19 @@
-"""Demonstrate the full waypoint-to-trajectory pipeline with GCOPTER.
+"""Demonstrate waypoint-to-trajectory optimization with GCOPTER.
 
-Defines waypoints, builds safe-flight-corridor polytopes, runs trajectory
-optimization, and visualizes the result as a 1×2 figure:
+Supports three trajectory shapes with 10 uniformly-sampled waypoints each:
+  line   — straight line with smooth start/stop
+  circle — circular loop at constant height
+  fig8   — lemniscate (figure-8) at constant height
+
+Visualization: 1×2 figure
   left  — 2D bird's-eye view (BEV) trajectory with SFC box overlays
   right — 1×3 grid: velocity, acceleration, jerk norms over time
 
 Usage:
-    uv run python examples/demo_trajectory.py
-    uv run demo trajectory
+    uv run demo trajectory              # all shapes
+    uv run demo trajectory line         # line_traj only
+    uv run demo trajectory circle       # circle_traj only
+    uv run demo trajectory fig8         # fig8_traj only
 """
 
 from __future__ import annotations
@@ -22,89 +28,123 @@ import numpy as np
 
 matplotlib.use("Agg")
 
+SHAPES = ("line", "circle", "fig8")
 
-def main() -> None:
-    import minco
 
-    print("=== GCOPTER Trajectory Optimization Demo ===\n")
-
-    optimizer = minco.gcopter.GCOPTERPolytopeSFC()
-    optimizer.configure_from_file("")
-
-    head_pva = np.column_stack(
+def _make_box_planes(size: float) -> np.ndarray:
+    return np.array(
         [
-            np.array([0.0, 0.0, 0.0]),
-            np.array([0.0, 0.0, 0.0]),
-            np.array([0.0, 0.0, 0.0]),
-        ]
-    )
-    tail_pva = np.column_stack(
-        [
-            np.array([8.0, 3.0, 1.0]),
-            np.array([0.0, 0.0, 0.0]),
-            np.array([0.0, 0.0, 0.0]),
+            [1.0, 0.0, 0.0, -size],
+            [-1.0, 0.0, 0.0, -size],
+            [0.0, 1.0, 0.0, -size],
+            [0.0, -1.0, 0.0, -size],
+            [0.0, 0.0, 1.0, -size],
+            [0.0, 0.0, -1.0, -size],
         ]
     )
 
-    inner_points = np.array(
+
+def _center_box(planes: np.ndarray, center: np.ndarray) -> np.ndarray:
+    t = planes.copy()
+    t[:, 3] -= planes[:, :3] @ center
+    return t
+
+
+def _gen_line() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, str]:
+    start = np.array([0.0, 0.0, 0.0])
+    end = np.array([10.0, 5.0, 1.0])
+    n_waypoints = 10
+    t_vectors = np.linspace(start, end, n_waypoints + 1).T  # 3 x (n+1)
+    waypoints = t_vectors[:, 1:]  # exclude start
+    head_pva = np.column_stack([start, np.zeros(3), np.zeros(3)])
+    tail_pva = np.column_stack([end, np.zeros(3), np.zeros(3)])
+    total_dist = float(np.linalg.norm(end - start))
+    speed = 3.0
+    total_time = total_dist / speed
+    n_pieces = n_waypoints + 1  # head→wp0, wp0→wp1, ..., wp_{n-1}→tail
+    piece_time = np.full(n_pieces, total_time / n_pieces)
+    box_size = 0.3
+    return head_pva, tail_pva, waypoints, piece_time, box_size, "line_traj"
+
+
+def _gen_circle() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, str]:
+    radius = 5.0
+    height = 1.0
+    omega = 0.6
+    n_waypoints = 10
+    total_time = 2.0 * np.pi / omega
+    angles = np.linspace(0.0, 2.0 * np.pi, n_waypoints + 2)
+    inner_angles = angles[1:-1]
+    waypoints = np.vstack(
         [
-            [2.0, 6.0],
-            [1.0, 2.0],
-            [0.5, 1.5],
+            radius * np.cos(inner_angles),
+            radius * np.sin(inner_angles),
+            np.full(inner_angles.shape, height),
         ]
     )
+    start_pos = np.array([radius, 0.0, height])
+    head_pva = np.column_stack([start_pos, np.zeros(3), np.zeros(3)])
+    tail_pva = head_pva.copy()
+    n_pieces = n_waypoints + 1
+    piece_time = np.full(n_pieces, total_time / n_pieces)
+    box_size = 0.3
+    return head_pva, tail_pva, waypoints, piece_time, box_size, "circle_traj"
 
-    initial_time = np.array([2.0, 2.0, 2.0])
 
-    box_size = 1.5
-    box_planes = np.array(
+def _gen_fig8() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, str]:
+    a = 4.0
+    height = 0.5
+    n_waypoints = 10
+    total_time = 12.0
+    shift = np.pi / 2
+    t_vals = np.linspace(shift, shift + 2.0 * np.pi, n_waypoints + 2)
+    inner_t = t_vals[1:-1]
+    waypoints = np.vstack(
         [
-            [1.0, 0.0, 0.0, -box_size],
-            [-1.0, 0.0, 0.0, -box_size],
-            [0.0, 1.0, 0.0, -box_size],
-            [0.0, -1.0, 0.0, -box_size],
-            [0.0, 0.0, 1.0, -box_size],
-            [0.0, 0.0, -1.0, -box_size],
+            a * np.sin(inner_t),
+            a * np.sin(inner_t) * np.cos(inner_t),
+            np.full(inner_t.shape, height),
         ]
     )
+    start_pos = np.array([a * np.sin(shift), a * np.sin(shift) * np.cos(shift), height])
+    head_pva = np.column_stack([start_pos, np.zeros(3), np.zeros(3)])
+    tail_pva = head_pva.copy()
+    n_pieces = n_waypoints + 1
+    piece_time = np.full(n_pieces, total_time / n_pieces)
+    box_size = 0.3
+    return head_pva, tail_pva, waypoints, piece_time, box_size, "fig8_traj"
 
-    def _center_box(center: np.ndarray) -> np.ndarray:
-        translated = box_planes.copy()
-        translated[:, 3] -= box_planes[:, :3] @ center
-        return translated
 
-    corridors = [_center_box(point) for point in inner_points.T]
-
-    print(
-        f"Problem: {len(initial_time)} pieces, {inner_points.shape[1]} waypoints, "
-        f"total time = {initial_time.sum():.0f}s"
-    )
-
+def _optimize(
+    optimizer: object,
+    head_pva: np.ndarray,
+    tail_pva: np.ndarray,
+    inner_time: np.ndarray,
+    inner_points: np.ndarray,
+    corridors: list[np.ndarray],
+) -> tuple[float, object]:
     ok = optimizer.setup_basic_trajectory(
         head_pva,
         tail_pva,
-        initial_time,
+        inner_time,
         inner_points,
         corridors,
         smoothing_factor=1.0e-1,
         integral_resolution=24,
     )
     if not ok:
-        print("setup_basic_trajectory failed")
-        return
-
-    t0 = time.perf_counter()
+        raise RuntimeError("setup_basic_trajectory failed")
     cost, traj = optimizer.optimize(rel_cost_tol=1.0e-3)
-    elapsed = (time.perf_counter() - t0) * 1e3
+    return cost, traj
 
-    if not np.isfinite(cost):
-        print("Optimization did not converge.")
-        return
 
-    print(f"Optimized in {elapsed:.0f} ms")
-    print(f"Final cost: {cost:.4f}")
-    print(f"Total duration: {traj.total_duration:.2f} s")
-    print(f"Number of pieces: {traj.get_piece_num()}")
+def _plot_and_save(
+    traj: object,
+    waypoints: np.ndarray,
+    box_size: float,
+    label: str,
+) -> None:
+    import minco
 
     n_samples = 300
     ts = np.linspace(0.0, traj.total_duration, n_samples)
@@ -123,9 +163,9 @@ def main() -> None:
     ax_acc = plt.subplot2grid((3, 2), (1, 1))
     ax_jerk = plt.subplot2grid((3, 2), (2, 1))
 
-    # --- left: BEV ---
-    for i in range(inner_points.shape[1]):
-        cx, cy = inner_points[0, i], inner_points[1, i]
+    box_planes = _make_box_planes(box_size)
+    for i in range(waypoints.shape[1]):
+        cx, cy = waypoints[0, i], waypoints[1, i]
         rect = mpatches.Rectangle(
             (cx - box_size, cy - box_size),
             2 * box_size,
@@ -140,40 +180,39 @@ def main() -> None:
 
     ax_bev.plot(positions[:, 0], positions[:, 1], "b-", linewidth=2, label="Trajectory", zorder=4)
     ax_bev.scatter(
-        positions[0, 0],
-        positions[0, 1],
-        c="green",
-        s=120,
-        marker="o",
-        zorder=5,
-        label="Start",
+        positions[0, 0], positions[0, 1], c="green", s=120, marker="o", zorder=5, label="Start"
     )
     ax_bev.scatter(
-        positions[-1, 0],
-        positions[-1, 1],
-        c="red",
-        s=120,
-        marker="o",
-        zorder=5,
-        label="End",
+        positions[-1, 0], positions[-1, 1], c="red", s=120, marker="o", zorder=5, label="End"
     )
     ax_bev.scatter(
-        inner_points[0, :],
-        inner_points[1, :],
+        waypoints[0, :],
+        waypoints[1, :],
         c="orange",
         s=60,
         marker="s",
         zorder=5,
         label="Waypoints",
     )
+
+    junction_ts = np.cumsum(traj.durations)[:-1]
+    opt_points = np.array([traj.get_pos(t) for t in junction_ts])
+    ax_bev.scatter(
+        opt_points[:, 0],
+        opt_points[:, 1],
+        c="cyan",
+        s=40,
+        marker="X",
+        zorder=6,
+        label="Optimized",
+    )
     ax_bev.set_xlabel("X [m]")
     ax_bev.set_ylabel("Y [m]")
-    ax_bev.set_title("BEV Trajectory")
+    ax_bev.set_title(f"BEV — {label}")
     ax_bev.legend(loc="upper left")
     ax_bev.grid(True)
     ax_bev.set_aspect("equal")
 
-    # --- right: 1×3 kinematic profiles ---
     ax_vel.plot(ts, speed, "r-", linewidth=1.5)
     ax_vel.set_ylabel("Velocity [m/s]")
     ax_vel.set_title("Velocity")
@@ -190,15 +229,55 @@ def main() -> None:
     ax_jerk.set_title("Jerk")
     ax_jerk.grid(True)
 
-    fig.suptitle("GCOPTER Trajectory Optimization", fontsize=14)
+    fig.suptitle(f"GCOPTER — {label}", fontsize=14)
     plt.tight_layout()
 
     os.makedirs("_tmp", exist_ok=True)
-    out_path = "_tmp/demo_trajectory.png"
+    out_path = f"_tmp/{label}.png"
     fig.savefig(out_path, dpi=120)
-    print(f"Saved figure to {out_path}")
+    print(f"  Saved figure to {out_path}")
     plt.close(fig)
 
+
+def run_shape(shape: str) -> None:
+    import minco
+
+    if shape == "all":
+        for s in SHAPES:
+            run_shape(s)
+        return
+
+    generators = {
+        "line": _gen_line,
+        "circle": _gen_circle,
+        "fig8": _gen_fig8,
+    }
+    gen = generators[shape]
+    head_pva, tail_pva, waypoints, piece_time, box_size, label = gen()
+
+    box_planes = _make_box_planes(box_size)
+    corridors = [_center_box(box_planes, waypoints[:, i]) for i in range(waypoints.shape[1])]
+
+    print(
+        f"  {label}: {len(piece_time)} pieces, {waypoints.shape[1]} waypoints, "
+        f"total time = {piece_time.sum():.1f}s"
+    )
+
+    optimizer = minco.gcopter.GCOPTERPolytopeSFC()
+    optimizer.configure_from_file("")
+
+    t0 = time.perf_counter()
+    cost, traj = _optimize(optimizer, head_pva, tail_pva, piece_time, waypoints, corridors)
+    elapsed = (time.perf_counter() - t0) * 1e3
+
+    print(f"  Optimized in {elapsed:.0f} ms  cost={cost:.4f}  duration={traj.total_duration:.2f}s")
+
+    _plot_and_save(traj, waypoints, box_size, label)
+
+
+def main() -> None:
+    print("=== GCOPTER Trajectory Optimization Demos ===\n")
+    run_shape("all")
     print("\nDone.")
 
 

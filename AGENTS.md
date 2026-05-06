@@ -9,7 +9,7 @@
 - The C++ extension builds to `_minco.*.so` via `CMakeLists.txt` + scikit-build-core.
 - `minco/` is the public Python package: `__init__.py` re-exports from `_minco`.
 - `minco/flatness_cache.py` provides B2 on-demand CasADi flatness with disk caching.
-- Tests live in `tests/`. Examples live in `examples/`.
+- Tests live in `tests/`. Examples live in `examples/`. API reference lives in `API.md`.
 - Generated artifacts (plots, logs, etc.) land in `_tmp/` (gitignored).
 
 ## 2. Everyday Commands
@@ -18,7 +18,8 @@
 - `uv run pytest` — execute the full Python test suite (`-k` to scope).
 - `uv run ruff check .` and `uv run ruff format .` — lint and format Python code.
 - `uv run demo flatness` — demonstrate flatness forward/backward.
-- `uv run demo trajectory` — demonstrate waypoint-to-trajectory pipeline (BEV + kinematic profiles).
+- `uv run demo trajectory` — all trajectory shapes: line, circle, fig8 (lemniscate).
+- `uv run demo trajectory line|circle|fig8` — single shape with 10 waypoints.
 - `python -m minco.flatness_cache --list` / `--clear` — manage cached flatness libraries.
 - `python -m minco.flatness_cache --generate-c --config config/casadi_quadrotor_flatness.yaml` — regenerate embedded C sources.
 

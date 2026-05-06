@@ -6,7 +6,9 @@
 
 **Python bindings for MINCO (Minimum Control Effort) trajectory optimization library** - A high-performance trajectory planning framework for multirotor and fixed-wing aircraft.
 
-![MINCO Trajectory](./thumbnail.png)
+![MINCO Trajectory — line](./thumbnail_line.png)
+![MINCO Trajectory — circle](./thumbnail_circle.png)
+![MINCO Trajectory — fig8](./thumbnail_fig8.png)
 
 ## Overview
 
@@ -126,8 +128,9 @@ for t in np.linspace(0, traj.total_duration, 5):
 
 Run the full demo:
 ```bash
-uv run demo trajectory   # BEV trajectory + vel/acc/jerk profiles
-uv run demo flatness     # flatness forward/backward
+uv run demo trajectory          # all shapes: line, circle, fig8
+uv run demo trajectory line     # line_traj only
+uv run demo flatness            # flatness forward/backward
 ```
 
 ## Flatness Caching (B2)
