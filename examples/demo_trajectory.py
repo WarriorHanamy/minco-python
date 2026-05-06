@@ -20,15 +20,41 @@ from __future__ import annotations
 
 import os
 import time
+from dataclasses import dataclass
 
 import matplotlib
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
+import yaml
 
 matplotlib.use("Agg")
 
 SHAPES = ("line", "circle", "fig8")
+
+
+@dataclass
+class Limits:
+    """Per-shape velocity / acceleration soft limits for the optimizer."""
+
+    v_max: float = 10.0
+    acc_max: float = 10.0
+
+    @classmethod
+    def from_yaml(cls, path: str = "config/default_gcopter.yaml") -> Limits:
+        with open(path) as f:
+            cfg = yaml.safe_load(f)
+        cost = cfg.get("cost", {})
+        return cls(
+            v_max=float(cost.get("v_max", 10.0)),
+            acc_max=float(cost.get("acc_max", 10.0)),
+        )
+
+
+INTERESTED = (
+    ("v_max", "get_max_vel_rate", "[m/s]"),
+    ("acc_max", "get_max_acc_rate", "[m/s²]"),
+)
 
 
 def _make_box_planes(size: float) -> np.ndarray:
@@ -143,6 +169,7 @@ def _plot_and_save(
     waypoints: np.ndarray,
     box_size: float,
     label: str,
+    limits: Limits,
 ) -> None:
     import minco
 
@@ -213,14 +240,30 @@ def _plot_and_save(
     ax_bev.grid(True)
     ax_bev.set_aspect("equal")
 
-    ax_vel.plot(ts, speed, "r-", linewidth=1.5)
+    ax_vel.plot(ts, speed, "r-", linewidth=1.5, label="speed")
+    ax_vel.axhline(
+        y=limits.v_max,
+        color="gray",
+        linestyle="--",
+        linewidth=1.0,
+        label=f"v_max={limits.v_max:.1f}",
+    )
     ax_vel.set_ylabel("Velocity [m/s]")
     ax_vel.set_title("Velocity")
+    ax_vel.legend(loc="upper right", fontsize=7)
     ax_vel.grid(True)
 
-    ax_acc.plot(ts, acc_norm, "g-", linewidth=1.5)
+    ax_acc.plot(ts, acc_norm, "g-", linewidth=1.5, label="acc")
+    ax_acc.axhline(
+        y=limits.acc_max,
+        color="gray",
+        linestyle="--",
+        linewidth=1.0,
+        label=f"acc_max={limits.acc_max:.1f}",
+    )
     ax_acc.set_ylabel("Accel [m/s²]")
     ax_acc.set_title("Acceleration")
+    ax_acc.legend(loc="upper right", fontsize=7)
     ax_acc.grid(True)
 
     ax_jerk.plot(ts, jerk_norm, "b-", linewidth=1.5)
@@ -258,9 +301,12 @@ def run_shape(shape: str) -> None:
     box_planes = _make_box_planes(box_size)
     corridors = [_center_box(box_planes, waypoints[:, i]) for i in range(waypoints.shape[1])]
 
+    limits = Limits.from_yaml()
+
     print(
         f"  {label}: {len(piece_time)} pieces, {waypoints.shape[1]} waypoints, "
         f"total time = {piece_time.sum():.1f}s"
+        f"  | v_max={limits.v_max:.0f} acc_max={limits.acc_max:.0f}"
     )
 
     optimizer = minco.gcopter.GCOPTERPolytopeSFC()
@@ -270,9 +316,24 @@ def run_shape(shape: str) -> None:
     cost, traj = _optimize(optimizer, head_pva, tail_pva, piece_time, waypoints, corridors)
     elapsed = (time.perf_counter() - t0) * 1e3
 
-    print(f"  Optimized in {elapsed:.0f} ms  cost={cost:.4f}  duration={traj.total_duration:.2f}s")
+    actuals = {
+        "v_max": getattr(traj, "get_max_vel_rate")(),
+        "acc_max": getattr(traj, "get_max_acc_rate")(),
+    }
 
-    _plot_and_save(traj, waypoints, box_size, label)
+    parts = []
+    for key, method, unit in INTERESTED:
+        limit = getattr(limits, key)
+        actual = actuals[key]
+        parts.append(f"{key}={actual:.2f}{unit} (limit={limit:.0f})")
+    info = "  ".join(parts)
+
+    print(
+        f"  Optimized in {elapsed:.0f} ms  cost={cost:.4f}"
+        f"  duration={traj.total_duration:.2f}s  {info}"
+    )
+
+    _plot_and_save(traj, waypoints, box_size, label, limits)
 
 
 def main() -> None:
