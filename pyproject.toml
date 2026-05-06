@@ -1,32 +1,35 @@
 [build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools>=61.0", "wheel", "pybind11[global]", "pybind11-stubgen>=0.10"]
+build-backend = "scikit_build_core.build"
+requires = [
+  "scikit-build-core>=0.10",
+  "pybind11[global]>=2.10",
+  "pybind11-stubgen>=0.10",
+]
 
 [project]
-authors = [
-  {name = "Hanamy", email = "rongerch@outlook.com"},
-]
-dependencies = [
-  "numpy>=2.3,<2.4",
-  "matplotlib",
-  "casadi",
-]
+authors = [{ name = "Hanamy", email = "rongerch@outlook.com" }]
+dependencies = ["numpy>=2.3,<2.4", "matplotlib", "casadi"]
 description = "Reinforcement Learning for Tailsitter UAVs"
-license = {text = "MIT"}
+license = { text = "MIT" }
 name = "minco-python"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 version = "0.1.0"
 
-[tool.setuptools.packages.find]
-where = ["."]
+[project.scripts]
+demo = "examples.demo:main"
 
-[tool.uv]
-dev-dependencies = [
+[tool.scikit-build]
+cmake.args = []
+wheel.packages = ["minco", "examples"]
+
+[dependency-groups]
+dev = [
   "ruff",
   "pre-commit",
   "pytest>=7.0",
   "pytest-cov",
+  "pybind11-stubgen>=2.0",
   "pyyaml",
 ]
 

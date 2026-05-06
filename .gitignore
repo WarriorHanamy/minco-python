@@ -11,6 +11,20 @@ __pycache__/
 # C extensions
 *.so
 
+# scikit-build-core
+_skbuild/
+
+# Generated artifacts
+_tmp/
+
+# Agent planning
+.opencode/
+
+# Stub artifacts
+stubs/
+*.pyi
+!minco.pyi
+
 # Distribution / packaging
 .Python
 build/
@@ -176,6 +190,3 @@ trys/
 *.mov
 *.mkv
 *.wmv
-
-
-*.pyi

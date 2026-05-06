@@ -4,12 +4,14 @@
 
 namespace py = pybind11;
 
-// Entry point that exposes the MINCO bindings under the `minco` module.
-PYBIND11_MODULE(minco, m)
+// Entry point that exposes the MINCO bindings under the `_minco` module.
+// The public `minco` Python package re-exports everything from `_minco`.
+PYBIND11_MODULE(_minco, m)
 {
     m.doc() = "Bindings for MINCO trajectory planning";
 
-    auto poly_traj = m.def_submodule("poly_traj", "Polynomial poly_traj primitives");
+    auto poly_traj =
+        m.def_submodule("poly_traj", "Polynomial poly_traj primitives");
     bind_polynomial(poly_traj);
 
     bind_sdlp(m);

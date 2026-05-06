@@ -1,5 +1,5 @@
 # Physical parameters embedded into the CasADi-generated quadrotor flatness model.
-# Run `uv run tools/build_casadi_flatness` after editing values to regenerate C sources.
+# Run `python -m minco.flatness_cache --generate-c` after editing values to regenerate C sources.
 flatness:
   mass: 1.1
   gravity: 9.81

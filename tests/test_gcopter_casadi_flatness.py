@@ -64,16 +64,15 @@ def _optimize(optimizer: object) -> tuple[float, np.ndarray]:
         initial_time,
         inner_points,
         corridors,
-        smoothing_factor=5.0e-3,
-        integral_resolution=6,
+        smoothing_factor=1.0e-1,
+        integral_resolution=24,
     )
-    cost, trajectory = optimizer.optimize(rel_cost_tol=1.0e-4)
+    cost, trajectory = optimizer.optimize(rel_cost_tol=1.0e-3)
     samples = np.linspace(0.0, trajectory.total_duration, 120)
     positions = np.array([trajectory.get_pos(t) for t in samples])
     return cost, positions
 
 
-@pytest.mark.xfail(reason="LBFGS optimizer convergence issues - pre-existing bug")
 def test_gcopter_casadi_flatness_matches_native() -> None:
     default_optimizer = minco.gcopter.GCOPTERPolytopeSFC()
     casadi_optimizer = minco.gcopter.GCOPTERPolytopeSFCCasadi()

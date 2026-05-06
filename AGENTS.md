@@ -2,19 +2,25 @@
 
 ## 1. Repository Overview
 
-- Core bindings live under `src/minco_trajectory/` and split into:
+- Core C++ bindings live under `_src/minco_trajectory/` and split into:
   - `include/`: header-only math utilities and trajectory planners.
   - `src/`: pybind11 binding entrypoints.
   - `config/`: YAML presets for flatness, cost, and planner tuning.
-- The Python extension builds to `minco.*.so` plus interface stubs at the repo root so downstream notebooks can `import minco` directly.
-- Tests live in `tests/` and mirror the exposed binding surfaces (e.g. `test_gcopter_bindings.py`, `test_flatness_bindings.py`). Support scripts belong in `scripts/`.
+- The C++ extension builds to `_minco.*.so` via `CMakeLists.txt` + scikit-build-core.
+- `minco/` is the public Python package: `__init__.py` re-exports from `_minco`.
+- `minco/flatness_cache.py` provides B2 on-demand CasADi flatness with disk caching.
+- Tests live in `tests/`. Examples live in `examples/`.
+- Generated artifacts (plots, logs, etc.) land in `_tmp/` (gitignored).
 
 ## 2. Everyday Commands
 
-- `uv sync` — install dependencies into the uv-managed virtual environment.
-- tools/[command] should be registered into justfile.
+- `uv sync` — build C++ extension via CMake + scikit-build-core and install dependencies.
 - `uv run pytest` — execute the full Python test suite (`-k` to scope).
 - `uv run ruff check .` and `uv run ruff format .` — lint and format Python code.
+- `uv run demo flatness` — demonstrate flatness forward/backward.
+- `uv run demo trajectory` — demonstrate waypoint-to-trajectory pipeline (BEV + kinematic profiles).
+- `python -m minco.flatness_cache --list` / `--clear` — manage cached flatness libraries.
+- `python -m minco.flatness_cache --generate-c --config config/casadi_quadrotor_flatness.yaml` — regenerate embedded C sources.
 
 ## 3. Coding Standards
 
@@ -42,7 +48,12 @@
 
 ## 6. Agent-Specific Practices
 
-- Regenerate Python stubs after signature changes with `uv run pybind11-stubgen minco && mv stubs/minco.pyi .`.
-- Executable helpers in `tools/` must remain extensionless and be invoked through `uv run tools/<name>` to keep the uv environment active (e.g. `uv run tools/rebuild_extension`).
-- When tweaking GCOPTER penalties, update the matching C++ integration and the smoke tests in `tests/test_gcopter_bindings.py`.
+- Regenerate Python stubs after C++ signature changes:
+  ```bash
+  uv run python -m pybind11_stubgen minco._minco --output-dir ./stubs --ignore-all-errors
+  ```
+- Extension module is `_minco` (private). Public API is `minco/__init__.py` + `minco.pyi` stubs.
+- Build system is `CMakeLists.txt` + scikit-build-core (no `setup.py`).
 - Prefer adding new configuration through YAML files in `config/` rather than hardcoding constants.
+- When tweaking GCOPTER penalties, update the matching C++ integration and the smoke tests in `tests/test_gcopter_bindings.py`.
+- For B2 flatness caching: generate C sources with `python -m minco.flatness_cache --generate-c`, rebuild with `uv sync`.

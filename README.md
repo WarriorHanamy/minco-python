@@ -1,6 +1,6 @@
 # MINCO-Python
 
-[![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
 [![C++](https://img.shields.io/badge/C++-20-blue.svg)](https://isocpp.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -45,8 +45,9 @@ MINCO-Python is a Python-first trajectory optimization library that provides eff
 
 ### Prerequisites
 
-- Python 3.13+
-- C++20 compatible compiler
+- Python 3.12+
+- C++20 compatible compiler (gcc or clang)
+- CMake 3.15+
 - Eigen3 library
 - yaml-cpp library
 
@@ -80,10 +81,11 @@ uv pip install -e . --no-deps
 
 ```bash
 # Generate pybind11 type hints for better IDE support
-uv run pybind11-stubgen minco
+uv run python -m pybind11_stubgen minco._minco --output-dir ./stubs --ignore-all-errors
 ```
 
-The generated stub files will be automatically placed alongside the compiled module.
+The generated stub files under `stubs/minco/_minco/` are re-exported by the
+committed `minco.pyi` file at the repo root.
 
 ## Quick Start
 
@@ -91,14 +93,66 @@ The generated stub files will be automatically placed alongside the compiled mod
 import numpy as np
 import minco
 
-# Create a simple trajectory
-trajectory = minco.Trajectory()
-# Generate trajectory points
-points = np.array([[0, 1, 2, 3],
-                   [0, 1, 0, 1],
-                   [1, 1, 1, 1]])
-# Optimize trajectory
-trajectory.optimize(points)
+# 1. Configure optimizer
+opt = minco.gcopter.GCOPTERPolytopeSFC()
+opt.configure_from_file("")  # uses default config
+
+# 2. Define problem: initial/final position-velocity-acceleration
+head_pva = np.column_stack([np.zeros(3), np.zeros(3), np.zeros(3)])
+tail_pva = np.column_stack([np.array([5.0, 0.0, 0.0]), np.zeros(3), np.zeros(3)])
+
+# Waypoints (3 x N)
+inner_points = np.array([[2.5], [0.0], [0.5]])
+initial_time = np.array([2.0, 2.0])
+
+# Safe flight corridors: each is (M, 4) half-space matrix
+sfc = [np.array([
+    [1, 0, 0, -1], [-1, 0, 0, -1],
+    [0, 1, 0, -1], [0, -1, 0, -1],
+    [0, 0, 1, -1], [0, 0, -1, -1],
+], dtype=float)]
+
+# 3. Setup and optimize
+opt.setup_basic_trajectory(head_pva, tail_pva, initial_time,
+                           inner_points, sfc,
+                           smoothing_factor=1e-1, integral_resolution=24)
+cost, traj = opt.optimize(rel_cost_tol=1e-3)
+
+# 4. Evaluate trajectory
+print(f"Cost: {cost:.2f}, Duration: {traj.total_duration:.2f}s, Pieces: {traj.get_piece_num()}")
+for t in np.linspace(0, traj.total_duration, 5):
+    print(f"  t={t:.1f}s  pos={traj.get_pos(t)}")
+```
+
+Run the full demo:
+```bash
+uv run demo trajectory   # BEV trajectory + vel/acc/jerk profiles
+uv run demo flatness     # flatness forward/backward
+```
+
+## Flatness Caching (B2)
+
+The `minco.flatness_cache` module provides on-demand CasADi flatness compilation
+with automatic disk caching.  Parameters are hashed with SHA256; the first call
+compiles the flatness model to a shared library via CasADi + gcc, and subsequent
+calls load from `~/.cache/minco/flatness/<hash>.so` instantly.
+
+```python
+from minco.flatness_cache import CachedFlatness
+
+cf = CachedFlatness(mass=1.0, gravity=9.81, horizontal_drag=0.1,
+                    vertical_drag=0.1, parasitic_drag=0.01, speed_smooth=1e-3)
+
+thrust, quat, omg = cf.forward(vel, acc, jer, yaw, yaw_rate)
+pg, vg, ag, jg, psig, dpsig = cf.backward(pos_grad, vel_grad, thr_grad,
+                                           quat_grad, omg_grad)
+```
+
+Cache management:
+```bash
+python -m minco.flatness_cache --list    # list cached parameter sets
+python -m minco.flatness_cache --clear   # clear all cached .so files
+python -m minco.flatness_cache --info    # show cache directory and disk usage
 ```
 
 ## Testing
@@ -172,14 +226,23 @@ The library includes built-in trajectory generators for:
 
 ```
 minco-python/
-├── src/minco_trajectory/     # C++ source code
-│   ├── include/              # Header files
-│   ├── src/                  # Implementation
-│   └── src/bindings/         # Python bindings
-├── tests/                    # Test suite
-├── config/                   # Configuration files
-├── docs/                     # Documentation
-└── tools/                    # Build utilities
+├── CMakeLists.txt                # C++ build configuration (scikit-build-core)
+├── _src/                         # Internal C++ pybind11 sources
+│   └── minco_trajectory/
+│       ├── include/              # Header-only math/trajectory/planner code
+│       ├── src/                  # Implementation & bindings
+│       └── config/               # Embedded YAML presets
+├── minco/                        # Public Python package
+│   ├── __init__.py               # Re-exports from compiled _minco extension
+│   ├── flatness_cache.py         # B2 on-demand CasADi flatness with caching
+│   └── py.typed                  # PEP 561 marker
+├── examples/                     # User-facing demo scripts
+│   ├── demo_flatness.py
+│   └── demo_trajectory.py
+├── tests/                        # Test suite
+├── config/                       # Runtime configuration files
+├── _tmp/                         # Generated artifacts (gitignored)
+└── pyproject.toml                # Package metadata & build config
 ```
 
 ## Technical Details

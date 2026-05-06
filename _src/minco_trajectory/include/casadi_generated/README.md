@@ -1,3 +1,3 @@
 Generated headers exposing CasADi-produced flatness interfaces.
 
-Populated via `uv run tools/build_casadi_flatness`.
+Populated via `python -m minco.flatness_cache --generate-c`.
