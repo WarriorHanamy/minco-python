@@ -8,6 +8,13 @@ repos:
         args: [--fix]   # auto-fix lint issues on commit
       - id: ruff-format # replaces black/isort, ensures code formatting
 
+  # clang-format for C++ sources
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v22.1.4
+    hooks:
+      - id: clang-format
+        files: ^_src/minco_trajectory/.*\.(c|h|cpp|hpp)$
+
   # Pre-commit’s built-in housekeeping hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0

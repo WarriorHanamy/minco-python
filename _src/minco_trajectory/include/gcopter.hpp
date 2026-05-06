@@ -25,16 +25,17 @@
 #ifndef GCOPTER_HPP
 #define GCOPTER_HPP
 
+#include <yaml-cpp/yaml.h>
+
 #include <Eigen/Eigen>
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <string>
 #include <type_traits>
 #include <vector>
-#include <string>
-#include <yaml-cpp/yaml.h>
 
 #include "flatness.hpp"
 #include "geo_utils.hpp"
@@ -45,8 +46,7 @@ namespace gcopter
 {
     inline constexpr const char *kDefaultGcopterConfigPath =
         "config/default_gcopter.yaml";
-    inline constexpr const char *kDefaultLbfgsConfigPath =
-        "config/lbfgs.yaml";
+    inline constexpr const char *kDefaultLbfgsConfigPath = "config/lbfgs.yaml";
 
     struct CostConfig
     {
@@ -69,15 +69,15 @@ namespace gcopter
 
         void configure_from_node(const YAML::Node &root)
         {
-            const YAML::Node node = root["cost"].IsDefined()
-                                         ? root["cost"]
-                                         : root;
+            const YAML::Node node =
+                root["cost"].IsDefined() ? root["cost"] : root;
             if (!node || node.IsNull())
             {
                 return;
             }
 
-            const auto assign = [&](const char *key, double &target) {
+            const auto assign = [&](const char *key, double &target)
+            {
                 if (node[key])
                 {
                     target = node[key].as<double>();
@@ -144,27 +144,30 @@ namespace gcopter
         }
     };
 
-    template <minco::flatness::FlatnessModel FlatnessModelT = minco::flatness::FlatnessMap>
+    template <minco::flatness::FlatnessModel FlatnessModelT =
+                  minco::flatness::FlatnessMap>
     class GCOPTER_PolytopeSFC
     {
        public:
         using PolyhedronV = Eigen::Matrix3Xd;
         using PolyhedronH = Eigen::MatrixX4d;
         using PolyhedraV  = std::vector<PolyhedronV>;
-       using PolyhedraH  = std::vector<PolyhedronH>;
+        using PolyhedraH  = std::vector<PolyhedronH>;
 
         using FlatnessModel  = FlatnessModelT;
         using FlatnessConfig = typename FlatnessModel::ConfigType;
 
-      private:
+       private:
         minco::MINCO_S3NU minco;
-        FlatnessConfig flatness_config_{};
-        double         yaw_smooth_ = 1.0e-6;
-        FlatnessModel  flatness_model_{};
+        FlatnessConfig    flatness_config_{};
+        double            yaw_smooth_ = 1.0e-6;
+        FlatnessModel     flatness_model_{};
 
         inline void refresh_flatness_config()
         {
-            if constexpr (requires(const FlatnessModel &model) { model.config(); })
+            if constexpr (requires(const FlatnessModel &model) {
+                              model.config();
+                          })
             {
                 flatness_config_ = flatness_model_.config();
             }
@@ -183,9 +186,8 @@ namespace gcopter
 
         inline bool configure_lbfgs_from_node(const YAML::Node &root)
         {
-            const YAML::Node node = root["lbfgs"].IsDefined()
-                                         ? root["lbfgs"]
-                                         : root;
+            const YAML::Node node =
+                root["lbfgs"].IsDefined() ? root["lbfgs"] : root;
 
             if (!node || node.IsNull() || !node.IsMap())
             {
@@ -194,7 +196,8 @@ namespace gcopter
 
             bool assigned = false;
 
-            const auto assign_int = [&](const char *key, int &target) {
+            const auto assign_int = [&](const char *key, int &target)
+            {
                 if (node[key])
                 {
                     target   = node[key].as<int>();
@@ -202,7 +205,8 @@ namespace gcopter
                 }
             };
 
-            const auto assign_double = [&](const char *key, double &target) {
+            const auto assign_double = [&](const char *key, double &target)
+            {
                 if (node[key])
                 {
                     target   = node[key].as<double>();
@@ -226,7 +230,8 @@ namespace gcopter
             return assigned;
         }
 
-        inline void configure_lbfgs_from_file(const std::string &file_path = std::string())
+        inline void configure_lbfgs_from_file(
+            const std::string &file_path = std::string())
         {
             const std::string path = file_path.empty()
                                          ? std::string(kDefaultLbfgsConfigPath)
@@ -513,8 +518,8 @@ namespace gcopter
             const Eigen::VectorXd &T, const Eigen::MatrixX3d &coeffs,
             const double &smoothFactor, const int &integralResolution,
             const CostConfig &config, const double yawSmooth,
-            FlatnessModel &flatness_model, double &cost,
-            Eigen::VectorXd &gradT, Eigen::MatrixX3d &gradC)
+            FlatnessModel &flatness_model, double &cost, Eigen::VectorXd &gradT,
+            Eigen::MatrixX3d &gradC)
         {
             const double velSqrMax  = config.v_max * config.v_max;
             const double omgxSqrMax = config.omg_x_max * config.omg_x_max;
@@ -537,9 +542,9 @@ namespace gcopter
             double                      s1, s2, s3, s4, s5;
             Eigen::Matrix<double, 6, 1> beta0, beta1, beta2, beta3, beta4;
 
-            using ForwardQuery  = typename FlatnessModel::ForwardQuery;
-            using ForwardResult = typename FlatnessModel::ForwardResult;
-            using BackwardQuery = typename FlatnessModel::BackwardQuery;
+            using ForwardQuery   = typename FlatnessModel::ForwardQuery;
+            using ForwardResult  = typename FlatnessModel::ForwardResult;
+            using BackwardQuery  = typename FlatnessModel::BackwardQuery;
             using BackwardResult = typename FlatnessModel::BackwardResult;
 
             for (int i = 0; i < pieceNum; i++)
@@ -573,10 +578,9 @@ namespace gcopter
                     const Eigen::Vector3d sna = c.transpose() * beta4;
 
                     const double velXYnorm = vel.head<2>().squaredNorm();
-                    const double psi = std::atan2(vel(1), vel(0));
-                    const double dpsi =
-                        (vel(0) * acc(1) - vel(1) * acc(0)) /
-                        std::max(velXYnorm + yawSmooth, 1e-12);
+                    const double psi       = std::atan2(vel(1), vel(0));
+                    const double dpsi = (vel(0) * acc(1) - vel(1) * acc(0)) /
+                                        std::max(velXYnorm + yawSmooth, 1e-12);
 
                     ForwardQuery forward_query;
                     forward_query.velocity     = vel;
@@ -586,7 +590,9 @@ namespace gcopter
                     {
                         forward_query.yaw = psi;
                     }
-                    if constexpr (requires(ForwardQuery q) { q.yaw_rate = dpsi; })
+                    if constexpr (requires(ForwardQuery q) {
+                                      q.yaw_rate = dpsi;
+                                  })
                     {
                         forward_query.yaw_rate = dpsi;
                     }
@@ -596,8 +602,7 @@ namespace gcopter
 
                     const double          thr  = forward_result.thrust;
                     const Eigen::Vector4d quat = forward_result.quaternion;
-                    const Eigen::Vector3d omg  =
-                        forward_result.angular_velocity;
+                    const Eigen::Vector3d omg = forward_result.angular_velocity;
 
                     const double violaVel = vel.squaredNorm() - velSqrMax;
                     const double violaAcc = acc.squaredNorm() - accSqrMax;
@@ -635,9 +640,9 @@ namespace gcopter
                         pena += weightAcc * violaAccPena;
                     }
 
-                    double violaOmgXPena = 0.0, violaOmgXPenaD = 0.0;
-                    double violaOmgYPena = 0.0, violaOmgYPenaD = 0.0;
-                    double violaOmgZPena = 0.0, violaOmgZPenaD = 0.0;
+                    double       violaOmgXPena = 0.0, violaOmgXPenaD = 0.0;
+                    double       violaOmgYPena = 0.0, violaOmgYPenaD = 0.0;
+                    double       violaOmgZPena = 0.0, violaOmgZPenaD = 0.0;
                     const double violaOmgX = omg(0) * omg(0) - omgxSqrMax;
                     const double violaOmgY = omg(1) * omg(1) - omgySqrMax;
                     const double violaOmgZ = omg(2) * omg(2) - omgzSqrMax;
@@ -645,22 +650,22 @@ namespace gcopter
                     if (smoothedL1(violaOmgX, smoothFactor, violaOmgXPena,
                                    violaOmgXPenaD))
                     {
-                        gradOmg(0) += config.omg_x_weight * violaOmgXPenaD *
-                                      2.0 * omg(0);
+                        gradOmg(0) +=
+                            config.omg_x_weight * violaOmgXPenaD * 2.0 * omg(0);
                         pena += config.omg_x_weight * violaOmgXPena;
                     }
                     if (smoothedL1(violaOmgY, smoothFactor, violaOmgYPena,
                                    violaOmgYPenaD))
                     {
-                        gradOmg(1) += config.omg_y_weight * violaOmgYPenaD *
-                                      2.0 * omg(1);
+                        gradOmg(1) +=
+                            config.omg_y_weight * violaOmgYPenaD * 2.0 * omg(1);
                         pena += config.omg_y_weight * violaOmgYPena;
                     }
                     if (smoothedL1(violaOmgZ, smoothFactor, violaOmgZPena,
                                    violaOmgZPenaD))
                     {
-                        gradOmg(2) += config.omg_z_weight * violaOmgZPenaD *
-                                      2.0 * omg(2);
+                        gradOmg(2) +=
+                            config.omg_z_weight * violaOmgZPenaD * 2.0 * omg(2);
                         pena += config.omg_z_weight * violaOmgZPena;
                     }
 
@@ -673,24 +678,23 @@ namespace gcopter
                     }
 
                     Eigen::Vector3d backPos, backVel, backAcc, backJer;
-                    double          psiGrad = 0.0;
+                    double          psiGrad  = 0.0;
                     double          dpsiGrad = 0.0;
-                    BackwardQuery backward_query;
-                    backward_query.position_gradient =
-                        Eigen::Vector3d::Zero();
+                    BackwardQuery   backward_query;
+                    backward_query.position_gradient = Eigen::Vector3d::Zero();
                     backward_query.velocity_gradient = velPenaltyGrad;
                     backward_query.thrust_gradient   = gradThr;
-                    backward_query.quaternion_gradient = gradQuat;
+                    backward_query.quaternion_gradient       = gradQuat;
                     backward_query.angular_velocity_gradient = gradOmg;
 
                     BackwardResult backward_result =
                         flatness_model.backward(backward_query);
 
-                    backPos = backward_result.position_total_gradient;
-                    backVel = backward_result.velocity_total_gradient;
-                    backAcc = backward_result.acceleration_total_gradient;
-                    backJer = backward_result.jerk_total_gradient;
-                    psiGrad = backward_result.yaw_total_gradient;
+                    backPos  = backward_result.position_total_gradient;
+                    backVel  = backward_result.velocity_total_gradient;
+                    backAcc  = backward_result.acceleration_total_gradient;
+                    backJer  = backward_result.jerk_total_gradient;
+                    psiGrad  = backward_result.yaw_total_gradient;
                     dpsiGrad = backward_result.yaw_rate_total_gradient;
                     (void)psiGrad;
                     (void)dpsiGrad;
@@ -703,9 +707,8 @@ namespace gcopter
                     totalGradAcc += accPenaltyGrad;
                     totalGradJer += jerPenaltyGrad;
 
-                    const double node  = (j == 0 || j == integralResolution)
-                                              ? 0.5
-                                              : 1.0;
+                    const double node =
+                        (j == 0 || j == integralResolution) ? 0.5 : 1.0;
                     alpha = j * integralFrac;
                     gradC.block<6, 3>(i * 6, 0) +=
                         (beta0 * totalGradPos.transpose() +
@@ -981,12 +984,10 @@ namespace gcopter
         }
 
        public:
-        GCOPTER_PolytopeSFC()
-        {
-            configure_from_file();
-        }
+        GCOPTER_PolytopeSFC() { configure_from_file(); }
 
-        inline void configure_from_file(const std::string &file_path = std::string())
+        inline void configure_from_file(
+            const std::string &file_path = std::string())
         {
             set_default_lbfgs_params();
 
@@ -1036,11 +1037,14 @@ namespace gcopter
                     configure_lbfgs_from_file(lbfgs_path_override);
                 }
 
-                if constexpr (requires(FlatnessModel &model, const std::string &p) {
+                if constexpr (requires(FlatnessModel     &model,
+                                       const std::string &p) {
                                   model.configure_from_file(p);
                               })
                 {
-                    if constexpr (requires { FlatnessModel::kRuntimeConfigurable; })
+                    if constexpr (requires {
+                                      FlatnessModel::kRuntimeConfigurable;
+                                  })
                     {
                         if (FlatnessModel::kRuntimeConfigurable)
                         {
@@ -1066,7 +1070,7 @@ namespace gcopter
             }
         }
 
-        inline FlatnessModel &flatness() { return flatness_model_; }
+        inline FlatnessModel       &flatness() { return flatness_model_; }
         inline const FlatnessModel &flatness() const { return flatness_model_; }
 
         inline bool setup_basic_trajectory(
