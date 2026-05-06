@@ -6,9 +6,9 @@
 
 **Python bindings for MINCO (Minimum Control Effort) trajectory optimization library** - A high-performance trajectory planning framework for multirotor and fixed-wing aircraft.
 
-![MINCO Trajectory — line](./thumbnail_line.png)
-![MINCO Trajectory — circle](./thumbnail_circle.png)
-![MINCO Trajectory — fig8](./thumbnail_fig8.png)
+![MINCO Trajectory — line](./thumbnails/thumbnail_line.png)
+![MINCO Trajectory — circle](./thumbnails/thumbnail_circle.png)
+![MINCO Trajectory — fig8](./thumbnails/thumbnail_fig8.png)
 
 ## Overview
 

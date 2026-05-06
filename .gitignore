@@ -192,4 +192,5 @@ trys/
 *.wmv
 
 # Thumbnails
-!thumbnail*.png
+!thumbnail.png
+!thumbnails/
