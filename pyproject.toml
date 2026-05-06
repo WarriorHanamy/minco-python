@@ -9,7 +9,7 @@ requires = [
 [project]
 authors = [{ name = "Hanamy", email = "rongerch@outlook.com" }]
 dependencies = ["numpy>=2.3,<2.4", "matplotlib", "casadi"]
-description = "Reinforcement Learning for Tailsitter UAVs"
+description = "Python bindings for MINCO trajectory optimization"
 license = { text = "MIT" }
 name = "minco-python"
 readme = "README.md"
