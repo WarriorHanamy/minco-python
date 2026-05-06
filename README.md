@@ -45,22 +45,13 @@ MINCO-Python is a Python-first trajectory optimization library that provides eff
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.12+
-- C++20 compatible compiler (gcc or clang)
-- CMake 3.15+
-- Eigen3 library
-- yaml-cpp library
-
 ### Install C++ Dependencies
 
 ```bash
-# Install required C++ libraries
-sudo apt install libyaml-cpp-dev libeigen-dev
+sudo apt install libyaml-cpp-dev libeigen3-dev cmake build-essential
 ```
 
-### Install uv Package Manager
+### Install uv
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -69,25 +60,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ### Install Python Dependencies
 
 ```bash
-# Install all Python dependencies
 uv sync
 ```
-It would automatically building the cpp project.
-<!-- 
-```bash
-# Build C++ extensions and install Python package
-uv pip install -e . --no-deps
-``` -->
-
-### Generate Type Stubs [Optional]
-
-```bash
-# Generate pybind11 type hints for better IDE support
-uv run python -m pybind11_stubgen minco._minco --output-dir ./stubs --ignore-all-errors
-```
-
-The generated stub files under `stubs/minco/_minco/` are re-exported by the
-committed `minco.pyi` file at the repo root.
+This builds the C++ extension and installs all Python dependencies.
 
 ## Quick Start
 
