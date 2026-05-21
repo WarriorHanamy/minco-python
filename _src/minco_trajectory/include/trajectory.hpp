@@ -121,6 +121,27 @@ class Piece
         return jer;
     }
 
+    inline Eigen::Vector3d getSna(const double &t) const
+    {
+        static_assert(D >= 4, "snap requires degree >= 4");
+        Eigen::Vector3d sna(0.0, 0.0, 0.0);
+        double          tn = 1.0;
+        int             k  = 1;
+        int             l  = 2;
+        int             m  = 3;
+        int             n  = 4;
+        for (int i = D - 4; i >= 0; i--)
+        {
+            sna += k * l * m * n * tn * coeffMat.col(i);
+            tn *= t;
+            k++;
+            l++;
+            m++;
+            n++;
+        }
+        return sna;
+    }
+
     inline CoefficientMat normalizePosCoeffMat() const
     {
         CoefficientMat nPosCoeffsMat;
@@ -471,6 +492,16 @@ class Trajectory
         }
         int pieceIdx = locatePieceIdx(t);
         return pieces[pieceIdx].getJer(t);
+    }
+
+    inline Eigen::Vector3d getSna(double t) const
+    {
+        if (getPieceNum() == 0)
+        {
+            return Eigen::Vector3d::Zero();
+        }
+        int pieceIdx = locatePieceIdx(t);
+        return pieces[pieceIdx].getSna(t);
     }
 
     inline Eigen::Vector3d getJuncPos(int juncIdx) const

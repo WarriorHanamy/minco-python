@@ -15,8 +15,8 @@ def generate_trajectory(shape_type="circle", radius=30.0, height=1.5, piece_coun
     pos0 = np.array([radius, 0.0, height])
     vel0 = np.zeros(3)
     acc0 = np.zeros(3)
-    head_pva = np.column_stack([pos0, vel0, acc0])
-    tail_pva = np.column_stack([pos0 + np.array([1, 0, 0]), vel0, acc0])
+    head_pva = np.column_stack([pos0, vel0, acc0, np.zeros(3)])
+    tail_pva = np.column_stack([pos0 + np.array([1, 0, 0]), vel0, acc0, np.zeros(3)])
 
     if shape_type == "circle":
         angles = np.linspace(0.0, 2.0 * np.pi, piece_count + 1)
@@ -44,12 +44,8 @@ def generate_trajectory(shape_type="circle", radius=30.0, height=1.5, piece_coun
         y = np.linspace(-side_length, side_length, points_per_side + 1)[:-1]
 
         top = np.vstack([x, np.full_like(x, side_length), np.full_like(x, height)])
-        right = np.vstack(
-            [np.full_like(y, side_length), y[::-1], np.full_like(y, height)]
-        )
-        bottom = np.vstack(
-            [x[::-1], np.full_like(x, -side_length), np.full_like(x, height)]
-        )
+        right = np.vstack([np.full_like(y, side_length), y[::-1], np.full_like(y, height)])
+        bottom = np.vstack([x[::-1], np.full_like(x, -side_length), np.full_like(x, height)])
         left = np.vstack([np.full_like(y, -side_length), y, np.full_like(y, height)])
 
         inner_points = np.hstack([top, right, bottom, left])[:, : piece_count - 1]

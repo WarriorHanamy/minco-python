@@ -99,8 +99,9 @@ def _run_gcopter_circle_warm_start() -> Dict[str, Any]:
     pos0 = np.array([radius, 0.0, height])
     vel0 = np.array([0.0, 0.0, 0.0])
     acc0 = np.array([0.0, 0.0, 0.0])
+    jer0 = np.array([0.0, 0.0, 0.0])
 
-    head_pva = np.column_stack([pos0, vel0, acc0])
+    head_pva = np.column_stack([pos0, vel0, acc0, jer0])
     tail_pva = head_pva.copy()
 
     angles = np.linspace(0.0, 2.0 * np.pi, piece_count + 1)

@@ -13,7 +13,7 @@ def _build_circle_problem(piece_count: int = 8) -> tuple[np.ndarray, ...]:
     vel0 = np.zeros(3)
     acc0 = np.zeros(3)
 
-    head_pva = np.column_stack([pos0, vel0, acc0])
+    head_pva = np.column_stack([pos0, vel0, acc0, np.zeros(3)])
     tail_pva = head_pva.copy()
 
     angles = np.linspace(0.0, 2.0 * np.pi, piece_count + 1)

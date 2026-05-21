@@ -36,7 +36,7 @@ A sequence of `PieceD` pieces forming a continuous trajectory. This is the
 primary output of `GCOPTER.optimize()`.
 
 ```python
-traj = GCOPTER.optimize(...)[1]  # returns Trajectory5
+traj = GCOPTER.optimize(...)[1]  # returns Trajectory7
 ```
 
 | Signature | Returns | Notes |
@@ -176,7 +176,7 @@ opt.configure_from_file("config/default_gcopter.yaml")
 | `GCOPTERPolytopeSFC()` | `GCOPTERPolytopeSFC` | |
 | `.configure_from_file(path="")` | `None` | Load optimizer YAML config |
 | `.setup_basic_trajectory(initial_pva, terminal_pva, initial_time, inner_points, sfc_polys, smoothing_factor, integral_resolution)` | `bool` | See below |
-| `.optimize(rel_cost_tol)` | `tuple[float, Trajectory5]` | `(cost, trajectory)` |
+| `.optimize(rel_cost_tol)` | `tuple[float, Trajectory7]` | `(cost, trajectory)` |
 
 ### `GCOPTERPolytopeSFCCasadi`
 
@@ -187,8 +187,8 @@ Same API as `GCOPTERPolytopeSFC` but uses `CasadiQuadrotorFlatnessMap`
 
 | Argument              | Shape          | Description                              |
 |-----------------------|----------------|------------------------------------------|
-| `initial_pva`         | `(3, 3)`       | Initial `[pos, vel, acc]` in columns       |
-| `terminal_pva`        | `(3, 3)`       | Terminal `[pos, vel, acc]` in columns      |
+| `initial_pva`         | `(3, 4)`       | Initial `[pos, vel, acc, jerk]` in columns   |
+| `terminal_pva`        | `(3, 4)`       | Terminal `[pos, vel, acc, jerk]` in columns  |
 | `initial_time`        | `(N,)`         | Per-piece initial durations [s]           |
 | `inner_points`        | `(3, N-1)`     | Intermediate waypoint positions           |
 | `sfc_polys`           | `list[np.ndarray]` | Safe-flight corridors, each `(M, 4)` half-space matrix |

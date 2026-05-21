@@ -40,6 +40,8 @@ namespace
                  "Get acceleration at time t.")
             .def("get_jer", &PieceD::getJer, py::arg("t"),
                  "Get jerk at time t.")
+            .def("get_sna", &PieceD::getSna, py::arg("t"),
+                 "Get snap (4th derivative) at time t.")
             .def("get_max_vel_rate", &PieceD::getMaxVelRate,
                  "Get the maximum velocity magnitude in this piece.")
             .def("get_max_acc_rate", &PieceD::getMaxAccRate,
@@ -85,6 +87,8 @@ namespace
                  "Get acceleration at time t along the trajectory.")
             .def("get_jer", &TrajectoryD::getJer, py::arg("t"),
                  "Get jerk at time t along the trajectory.")
+            .def("get_sna", &TrajectoryD::getSna, py::arg("t"),
+                 "Get snap (4th derivative) at time t along the trajectory.")
             .def("clear", &TrajectoryD::clear,
                  "Clear all pieces from the trajectory.")
             .def("append_piece",

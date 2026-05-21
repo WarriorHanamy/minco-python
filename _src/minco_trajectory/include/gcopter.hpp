@@ -158,7 +158,7 @@ namespace gcopter
         using FlatnessConfig = typename FlatnessModel::ConfigType;
 
        private:
-        minco::MINCO_S3NU minco;
+        minco::MINCO_S4NU minco;
         FlatnessConfig    flatness_config_{};
         double            yaw_smooth_ = 1.0e-6;
         FlatnessModel     flatness_model_{};
@@ -252,8 +252,8 @@ namespace gcopter
             }
         }
 
-        Eigen::Matrix3d headPVA;
-        Eigen::Matrix3d tailPVA;
+        Eigen::Matrix<double, 3, 4> headPVAJ;
+        Eigen::Matrix<double, 3, 4> tailPVAJ;
 
         PolyhedraV       vPolytopes;
         PolyhedraH       hPolytopes;
@@ -539,8 +539,9 @@ namespace gcopter
             const double integralFrac = 1.0 / integralResolution;
 
             double                      step, alpha;
-            double                      s1, s2, s3, s4, s5;
-            Eigen::Matrix<double, 6, 1> beta0, beta1, beta2, beta3, beta4;
+            double                      s1, s2, s3, s4, s5, s6, s7;
+            Eigen::Matrix<double, 8, 1> beta0, beta1, beta2, beta3, beta4,
+                beta5, beta6, beta7;
 
             using ForwardQuery   = typename FlatnessModel::ForwardQuery;
             using ForwardResult  = typename FlatnessModel::ForwardResult;
@@ -549,8 +550,8 @@ namespace gcopter
 
             for (int i = 0; i < pieceNum; i++)
             {
-                const Eigen::Matrix<double, 6, 3> &c =
-                    coeffs.block<6, 3>(i * 6, 0);
+                const Eigen::Matrix<double, 8, 3> &c =
+                    coeffs.block<8, 3>(i * 8, 0);
                 step = T(i) * integralFrac;
                 for (int j = 0; j <= integralResolution; j++)
                 {
@@ -559,18 +560,34 @@ namespace gcopter
                     s3       = s2 * s1;
                     s4       = s2 * s2;
                     s5       = s4 * s1;
+                    s6       = s4 * s2;
+                    s7       = s4 * s3;
                     beta0(0) = 1.0, beta0(1) = s1, beta0(2) = s2, beta0(3) = s3,
-                    beta0(4) = s4, beta0(5) = s5;
+                    beta0(4) = s4, beta0(5) = s5, beta0(6) = s6,
+                    beta0(7) = s7;
                     beta1(0) = 0.0, beta1(1) = 1.0, beta1(2) = 2.0 * s1,
                     beta1(3) = 3.0 * s2, beta1(4) = 4.0 * s3,
-                    beta1(5) = 5.0 * s4;
+                    beta1(5) = 5.0 * s4, beta1(6) = 6.0 * s5,
+                    beta1(7) = 7.0 * s6;
                     beta2(0) = 0.0, beta2(1) = 0.0, beta2(2) = 2.0,
                     beta2(3) = 6.0 * s1, beta2(4) = 12.0 * s2,
-                    beta2(5) = 20.0 * s3;
+                    beta2(5) = 20.0 * s3, beta2(6) = 30.0 * s4,
+                    beta2(7) = 42.0 * s5;
                     beta3(0) = 0.0, beta3(1) = 0.0, beta3(2) = 0.0,
-                    beta3(3) = 6.0, beta3(4) = 24.0 * s1, beta3(5) = 60.0 * s2;
+                    beta3(3) = 6.0, beta3(4) = 24.0 * s1, beta3(5) = 60.0 * s2,
+                    beta3(6) = 120.0 * s3, beta3(7) = 210.0 * s4;
                     beta4(0) = 0.0, beta4(1) = 0.0, beta4(2) = 0.0,
-                    beta4(3) = 0.0, beta4(4) = 24.0, beta4(5) = 120.0 * s1;
+                    beta4(3) = 0.0, beta4(4) = 24.0, beta4(5) = 120.0 * s1,
+                    beta4(6) = 360.0 * s2, beta4(7) = 840.0 * s3;
+                    beta5(0) = 0.0, beta5(1) = 0.0, beta5(2) = 0.0,
+                    beta5(3) = 0.0, beta5(4) = 0.0, beta5(5) = 120.0,
+                    beta5(6) = 720.0 * s1, beta5(7) = 2520.0 * s2;
+                    beta6(0) = 0.0, beta6(1) = 0.0, beta6(2) = 0.0,
+                    beta6(3) = 0.0, beta6(4) = 0.0, beta6(5) = 0.0,
+                    beta6(6) = 720.0, beta6(7) = 5040.0 * s1;
+                    beta7(0) = 0.0, beta7(1) = 0.0, beta7(2) = 0.0,
+                    beta7(3) = 0.0, beta7(4) = 0.0, beta7(5) = 0.0,
+                    beta7(6) = 0.0, beta7(7) = 5040.0;
 
                     const Eigen::Vector3d vel = c.transpose() * beta1;
                     const Eigen::Vector3d acc = c.transpose() * beta2;
@@ -710,7 +727,7 @@ namespace gcopter
                     const double node =
                         (j == 0 || j == integralResolution) ? 0.5 : 1.0;
                     alpha = j * integralFrac;
-                    gradC.block<6, 3>(i * 6, 0) +=
+                    gradC.block<8, 3>(i * 8, 0) +=
                         (beta0 * totalGradPos.transpose() +
                          beta1 * totalGradVel.transpose() +
                          beta2 * totalGradAcc.transpose() +
@@ -1074,22 +1091,22 @@ namespace gcopter
         inline const FlatnessModel &flatness() const { return flatness_model_; }
 
         inline bool setup_basic_trajectory(
-            const Eigen::Matrix3d  &initialPVA,
-            const Eigen::Matrix3d  &terminalPVA,
+            const Eigen::Matrix<double, 3, 4>  &initialPVA,
+            const Eigen::Matrix<double, 3, 4>  &terminalPVA,
             const Eigen::VectorXd  &initialTime,
             const Eigen::Matrix3Xd &initialPoints,
             const PolyhedraH &sfc_control_points, const double smoothingFactor,
             const int integralResolution)
         {
-            headPVA           = initialPVA;
-            tailPVA           = terminalPVA;
+            headPVAJ          = initialPVA;
+            tailPVAJ          = terminalPVA;
             smoothEps         = smoothingFactor;
             integralRes       = integralResolution;
             int size_corridor = sfc_control_points.size();
             pieceN            = size_corridor + 1;
             temporalDim       = pieceN;
 
-            minco.setConditions(headPVA, tailPVA, pieceN);
+            minco.setConditions(headPVAJ, tailPVAJ, pieceN);
 
             // Allocate temp variables
             points.resize(3, pieceN - 1);
@@ -1132,12 +1149,12 @@ namespace gcopter
             }
 
             // allocate memory
-            minco.setConditions(headPVA, tailPVA, pieceN);
+            minco.setConditions(headPVAJ, tailPVAJ, pieceN);
             points.resize(3, pieceN - 1);
             times.resize(pieceN);
             gradByPoints.resize(3, pieceN - 1);
             gradByTimes.resize(pieceN);
-            partialGradByCoeffs.resize(6 * pieceN, 3);
+            partialGradByCoeffs.resize(8 * pieceN, 3);
             partialGradByTimes.resize(pieceN);
 
             times  = initialTime;
@@ -1146,7 +1163,7 @@ namespace gcopter
             return true;
         }
 
-        inline double optimize(Trajectory<5> &traj, const double &relCostTol)
+        inline double optimize(Trajectory<7> &traj, const double &relCostTol)
         {
             Eigen::VectorXd             x(temporalDim + spatialDim);
             Eigen::Map<Eigen::VectorXd> tau(x.data(), temporalDim);

@@ -37,7 +37,7 @@ void bind_gcopter(py::module_ &m)
             "optimize",
             [](DefaultOptimizer &self, double rel_cost_tol)
             {
-                Trajectory<5> traj;
+                Trajectory<7> traj;
                 double        cost = self.optimize(traj, rel_cost_tol);
                 return py::make_tuple(cost, traj);
             },
@@ -64,7 +64,7 @@ void bind_gcopter(py::module_ &m)
             "optimize",
             [](CasadiOptimizer &self, double rel_cost_tol)
             {
-                Trajectory<5> traj;
+                Trajectory<7> traj;
                 double        cost = self.optimize(traj, rel_cost_tol);
                 return py::make_tuple(cost, traj);
             },

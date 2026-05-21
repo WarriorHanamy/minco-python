@@ -6,8 +6,8 @@ Supports three trajectory shapes with 10 uniformly-sampled waypoints each:
   fig8   — lemniscate (figure-8) at constant height
 
 Visualization: 1×2 figure
-  left  — 2D bird's-eye view (BEV) trajectory with SFC box overlays
-  right — 1×3 grid: velocity, acceleration, jerk norms over time
+  left  — 2D bird's-eye view (BEV) trajectory with SFC box overlays + pos Z
+  right — 2×2 grid: velocity, acceleration, jerk, snap norms over time
 
 Usage:
     uv run demo trajectory              # all shapes
@@ -82,8 +82,8 @@ def _gen_line() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, 
     n_waypoints = 10
     t_vectors = np.linspace(start, end, n_waypoints + 1).T  # 3 x (n+1)
     waypoints = t_vectors[:, 1:]  # exclude start
-    head_pva = np.column_stack([start, np.zeros(3), np.zeros(3)])
-    tail_pva = np.column_stack([end, np.zeros(3), np.zeros(3)])
+    head_pva = np.column_stack([start, np.zeros(3), np.zeros(3), np.zeros(3)])
+    tail_pva = np.column_stack([end, np.zeros(3), np.zeros(3), np.zeros(3)])
     total_dist = float(np.linalg.norm(end - start))
     speed = 3.0
     total_time = total_dist / speed
@@ -109,7 +109,7 @@ def _gen_circle() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float
         ]
     )
     start_pos = np.array([radius, 0.0, height])
-    head_pva = np.column_stack([start_pos, np.zeros(3), np.zeros(3)])
+    head_pva = np.column_stack([start_pos, np.zeros(3), np.zeros(3), np.zeros(3)])
     tail_pva = head_pva.copy()
     n_pieces = n_waypoints + 1
     piece_time = np.full(n_pieces, total_time / n_pieces)
@@ -133,7 +133,7 @@ def _gen_fig8() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, 
         ]
     )
     start_pos = np.array([a * np.sin(shift), a * np.sin(shift) * np.cos(shift), height])
-    head_pva = np.column_stack([start_pos, np.zeros(3), np.zeros(3)])
+    head_pva = np.column_stack([start_pos, np.zeros(3), np.zeros(3), np.zeros(3)])
     tail_pva = head_pva.copy()
     n_pieces = n_waypoints + 1
     piece_time = np.full(n_pieces, total_time / n_pieces)
@@ -179,16 +179,20 @@ def _plot_and_save(
     velocities = np.array([traj.get_vel(t) for t in ts])
     accelerations = np.array([traj.get_acc(t) for t in ts])
     jerks = np.array([traj.get_jer(t) for t in ts])
+    snaps = np.array([traj.get_sna(t) for t in ts])
 
     speed = np.linalg.norm(velocities, axis=1)
     acc_norm = np.linalg.norm(accelerations, axis=1)
     jerk_norm = np.linalg.norm(jerks, axis=1)
+    snap_norm = np.linalg.norm(snaps, axis=1)
 
-    fig = plt.figure(figsize=(14, 10))
-    ax_bev = plt.subplot2grid((3, 2), (0, 0), rowspan=3)
-    ax_vel = plt.subplot2grid((3, 2), (0, 1))
-    ax_acc = plt.subplot2grid((3, 2), (1, 1))
-    ax_jerk = plt.subplot2grid((3, 2), (2, 1))
+    fig = plt.figure(figsize=(14, 13))
+    ax_bev = plt.subplot2grid((4, 2), (0, 0), rowspan=3)
+    ax_pos_z = plt.subplot2grid((4, 2), (3, 0))
+    ax_vel = plt.subplot2grid((4, 2), (0, 1))
+    ax_acc = plt.subplot2grid((4, 2), (1, 1))
+    ax_jerk = plt.subplot2grid((4, 2), (2, 1))
+    ax_snap = plt.subplot2grid((4, 2), (3, 1))
 
     box_planes = _make_box_planes(box_size)
     for i in range(waypoints.shape[1]):
@@ -240,6 +244,12 @@ def _plot_and_save(
     ax_bev.grid(True)
     ax_bev.set_aspect("equal")
 
+    ax_pos_z.plot(ts, positions[:, 2], "m-", linewidth=1.5)
+    ax_pos_z.set_xlabel("Time [s]")
+    ax_pos_z.set_ylabel("Z [m]")
+    ax_pos_z.set_title("Position Z")
+    ax_pos_z.grid(True)
+
     ax_vel.plot(ts, speed, "r-", linewidth=1.5, label="speed")
     ax_vel.axhline(
         y=limits.v_max,
@@ -267,10 +277,15 @@ def _plot_and_save(
     ax_acc.grid(True)
 
     ax_jerk.plot(ts, jerk_norm, "b-", linewidth=1.5)
-    ax_jerk.set_xlabel("Time [s]")
     ax_jerk.set_ylabel("Jerk [m/s³]")
     ax_jerk.set_title("Jerk")
     ax_jerk.grid(True)
+
+    ax_snap.plot(ts, snap_norm, "c-", linewidth=1.5)
+    ax_snap.set_xlabel("Time [s]")
+    ax_snap.set_ylabel("Snap [m/s⁴]")
+    ax_snap.set_title("Snap")
+    ax_snap.grid(True)
 
     fig.suptitle(f"GCOPTER — {label}", fontsize=14)
     plt.tight_layout()
