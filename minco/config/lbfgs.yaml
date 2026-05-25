@@ -1,0 +1,8 @@
+# Default L-BFGS optimizer parameters for GCOPTER
+lbfgs:
+  mem_size: 256
+  past: 3
+  min_step: 1.0e-20
+  max_linesearch: 256
+  g_epsilon: 0.0
+  s_curv_coeff: 0.999999
